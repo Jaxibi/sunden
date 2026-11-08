@@ -1,4 +1,4 @@
-"""Héros animé : squelette, maillage rigide (chaque pièce suit un seul os) et animations.
+r"""Héros animé : squelette, maillage rigide (chaque pièce suit un seul os) et animations.
 
 Usage (depuis E:\dev\sunden) :
     D:\dev\Blender\blender.exe -b blender/exemple_hackslash.blend --python blender/rig_hero.py
@@ -50,35 +50,79 @@ BONES.append(("epee", (0.31, 0, 0.53), (0.31, 0.35, 0.53), "avantbras.R"))
 rig = rig_utils.Rig("Heros", BONES)
 
 
-# --------------------------------------------------------------------------- maillage (pièces rigides)
-def box(size, center, mat, bone):
-    return {"size": size, "center": center, "mat": mat, "bone": bone}
+# --------------------------------------------------------------------------- maillage (volumes sculptés)
+def part(shape, size, center, mat, bone, **kw):
+    return {"shape": shape, "size": size, "center": center, "mat": mat, "bone": bone, **kw}
 
 
 PARTS = [
-    box((0.48, 0.32, 0.10), (0, 0, 0.55), "Cuir", "hanches"),
-    box((0.10, 0.04, 0.08), (0, 0.17, 0.55), "Or", "hanches"),
-    box((0.46, 0.30, 0.42), (0, 0, 0.81), "Tunique", "torse"),
-    box((0.32, 0.30, 0.32), (0, 0.01, 1.20), "Peau", "tete"),
-    box((0.35, 0.33, 0.12), (0, -0.01, 1.38), "Cheveux", "tete"),
-    box((0.35, 0.10, 0.24), (0, -0.14, 1.26), "Cheveux", "tete"),
-    box((0.46, 0.05, 0.62), (0, -0.20, 0.72), "Cape", "cape"),
-    box((0.05, 0.20, 0.05), (0.31, 0.0, 0.53), "Cuir", "epee"),
-    box((0.30, 0.05, 0.05), (0.31, 0.11, 0.53), "Or", "epee"),
-    box((0.08, 0.95, 0.025), (0.31, 0.60, 0.53), "Acier", "epee"),
-    box((0.06, 0.40, 0.46), (-0.40, 0.03, 0.66), "Tunique", "avantbras.L"),
-    box((0.04, 0.12, 0.12), (-0.44, 0.03, 0.66), "Or", "avantbras.L"),
+    # Hanches : basque de tunique évasée + ceinture cintrée + boucle dorée
+    part("rounded_box", (0.44, 0.32, 0.19), (0, 0, 0.50), "Tunique", "hanches",
+         top=(0.82, 0.82), bottom=(1.12, 1.08), bevel=0.22, power=0.82),
+    part("limb", (0.42, 0.31, 0.09), (0, 0, 0.57), "Cuir", "hanches", power=0.82),
+    part("dome", (0.12, 0.07, 0.11), (0, 0.16, 0.57), "Or", "hanches", rot=(-90, 0, 0)),
+
+    # Torse en V athlétique + baudrier en cuir + foulard rouge autour du cou
+    part("rounded_box", (0.45, 0.31, 0.42), (0, 0, 0.80), "Tunique", "torse",
+         bottom=(0.78, 0.80), mid=(0.96, 0.96), top=(1.08, 1.04), bevel=0.26, power=0.84),
+    part("limb", (0.46, 0.32, 0.07), (0, 0.01, 0.81), "Cuir", "torse", rot=(0, 28, 0)),
+    part("limb", (0.37, 0.34, 0.12), (0, -0.01, 1.01), "Cape", "torse",
+         bottom=(1.06, 1.06), top=(0.86, 0.88)),
+
+    # Tête : cou, visage ovale sculpté, chevelure volumineuse en mèches
+    part("limb", (0.16, 0.16, 0.10), (0, 0, 1.05), "Peau", "tete"),
+    part("rounded_box", (0.33, 0.32, 0.33), (0, 0.02, 1.21), "Peau", "tete",
+         bottom=(0.78, 0.82), mid=(1.0, 1.0), top=(0.92, 0.94), bevel=0.30, power=0.88),
+    part("dome", (0.38, 0.37, 0.22), (0, -0.01, 1.33), "Cheveux", "tete", flare=1.04),
+    part("limb", (0.17, 0.24, 0.11), (0.05, 0.12, 1.34), "Cheveux", "tete",
+         rot=(25, 15, -22), bottom=(0.45, 0.45), top=(1.0, 1.0)),
+    part("dome", (0.36, 0.22, 0.28), (0, -0.11, 1.24), "Cheveux", "tete", rot=(-55, 0, 0)),
+    part("limb", (0.24, 0.14, 0.18), (0, -0.16, 1.14), "Cheveux", "tete",
+         rot=(-35, 0, 0), bottom=(0.4, 0.4), top=(1.0, 1.0)),
+
+    # Cape trapézoïdale plissée
+    part("cape", (0.50, 0.10, 0.66), (0, -0.20, 0.70), "Cape", "cape", rot=(8, 0, 0)),
+
+    # Épée : pommeau rond, fusée en cuir, garde profilée, lame large en losange à pointe
+    part("dome", (0.09, 0.09, 0.09), (0.31, -0.09, 0.53), "Or", "epee", rot=(-90, 0, 0)),
+    part("limb", (0.06, 0.18, 0.06), (0.31, 0.01, 0.53), "Cuir", "epee", rot=(90, 0, 0)),
+    part("rounded_box", (0.34, 0.07, 0.07), (0.31, 0.11, 0.53), "Or", "epee",
+         bottom=(0.75, 0.75), top=(1.05, 1.05), bevel=0.22, smooth=False),
+    part("blade", (0.14, 0.96, 0.055), (0.31, 0.61, 0.53), "Acier", "epee"),
+
+    # Bouclier en écu incurvé + bordure et blason dorés
+    part("shield", (0.08, 0.44, 0.52), (-0.40, 0.04, 0.65), "Tunique", "avantbras.L"),
+    part("rounded_box", (0.09, 0.39, 0.07), (-0.40, 0.04, 0.89), "Or", "avantbras.L", bevel=0.2, smooth=False),
+    part("dome", (0.07, 0.15, 0.18), (-0.44, 0.04, 0.67), "Or", "avantbras.L", rot=(0, -90, 0)),
 ]
 for side, s in (("R", 1), ("L", -1)):
     PARTS += [
-        box((0.20, 0.34, 0.12), (0.30 * s, 0, 1.0), "Acier", "torse"),
-        box((0.05, 0.02, 0.07), (0.07 * s, 0.165, 1.2), "Noir", "tete"),
-        box((0.13, 0.13, 0.25), (0.31 * s, 0, 0.86), "Tunique", f"bras.{side}"),
-        box((0.12, 0.12, 0.17), (0.31 * s, 0, 0.655), "Tunique", f"avantbras.{side}"),
-        box((0.11, 0.11, 0.10), (0.31 * s, 0, 0.53), "Peau", f"avantbras.{side}"),
-        box((0.15, 0.15, 0.25), (0.12 * s, 0, 0.385), "Pantalon", f"cuisse.{side}"),
-        box((0.14, 0.14, 0.20), (0.12 * s, 0, 0.17), "Pantalon", f"tibia.{side}"),
-        box((0.17, 0.22, 0.12), (0.12 * s, 0.02, 0.06), "Cuir", f"tibia.{side}"),
+        # Épaulettes bombées avec liseré doré
+        part("dome", (0.24, 0.34, 0.18), (0.29 * s, 0, 0.99), "Acier", "torse",
+             rot=(0, 22 * s, 0), flare=1.08),
+        part("limb", (0.25, 0.35, 0.05), (0.30 * s, 0, 0.93), "Or", "torse",
+             rot=(0, 22 * s, 0)),
+        # Oreilles, mèches latérales et yeux
+        part("dome", (0.06, 0.08, 0.10), (0.165 * s, 0.0, 1.20), "Peau", "tete", rot=(0, 80 * s, 0)),
+        part("limb", (0.09, 0.14, 0.22), (0.16 * s, 0.04, 1.24), "Cheveux", "tete",
+             rot=(12, -10 * s, 0), bottom=(0.45, 0.5), top=(1.0, 1.0)),
+        part("rounded_box", (0.055, 0.03, 0.075), (0.075 * s, 0.168, 1.20), "Noir", "tete", bevel=0.25),
+        # Bras fuselés, brassards de cuir et poings ronds
+        part("limb", (0.15, 0.15, 0.25), (0.31 * s, 0, 0.86), "Tunique", f"bras.{side}",
+             top=(1.06, 1.06), bottom=(0.85, 0.85)),
+        part("limb", (0.14, 0.14, 0.18), (0.31 * s, 0, 0.66), "Cuir", f"avantbras.{side}",
+             top=(1.08, 1.08), bottom=(0.82, 0.82)),
+        part("dome", (0.12, 0.13, 0.12), (0.31 * s, 0.01, 0.53), "Peau", f"avantbras.{side}",
+             rot=(180, 0, 0)),
+        # Jambes fuselées et bottes à revers
+        part("limb", (0.17, 0.17, 0.25), (0.12 * s, 0, 0.385), "Pantalon", f"cuisse.{side}",
+             top=(1.08, 1.08), bottom=(0.84, 0.84)),
+        part("limb", (0.14, 0.14, 0.16), (0.12 * s, 0, 0.21), "Pantalon", f"tibia.{side}",
+             top=(1.0, 1.0), bottom=(0.85, 0.85)),
+        part("limb", (0.17, 0.18, 0.11), (0.12 * s, 0.0, 0.13), "Cuir", f"tibia.{side}",
+             top=(1.12, 1.12), bottom=(0.88, 0.88)),
+        part("dome", (0.17, 0.25, 0.11), (0.12 * s, 0.04, 0.055), "Cuir", f"tibia.{side}",
+             flare=1.05),
     ]
 rig.build_mesh(PARTS)
 

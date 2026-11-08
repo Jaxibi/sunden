@@ -164,6 +164,91 @@ SOUNDS = [
         "warm French horns, bodhran frame drums and orchestral timpani",
         "Opens at time zero with two bodhran hits and a bold French horn call rising D4, A4, D5, "
         f"answered by a timpani roll and a bright open fifth, {SPACE}, resolving and ringing out.")),
+    # ------------------------------------------------------------------ niveau 1 : objets et décor
+    ("pot_break", SFX, 1.5, 0.45, -5.0, 3, True, 0.12, caption(
+        "Acoustic Percussion Earcon / Bright Clay Pot Strike",
+        "Crisp, satisfying, small reward, playful",
+        "130 BPM in D Dorian",
+        "a clay udu drum and a rosewood marimba",
+        "Opens at time zero with one sharp bright slap on a clay udu drum followed by a tiny "
+        f"descending rosewood marimba flurry A4, F4, D4, {SPACE}, decaying into silence.")),
+    ("crate_break", SFX, 1.5, 0.45, -5.0, 2, True, 0.12, caption(
+        "Acoustic Percussion Earcon / Dry Wooden Crack",
+        "Crunchy, satisfying, small reward",
+        "120 BPM in D Dorian",
+        "a wooden slit log drum, woodblocks and a frame drum",
+        "Opens at time zero with one loud dry crack on a wooden slit log drum and two quick "
+        f"tumbling woodblock knocks, {SPACE}, decaying into silence.")),
+    ("heart_pickup", SFX, 1.5, 0.6, -6.0, 2, True, 0.2, caption(
+        "Mallet Percussion Earcon / Rising Healing Chime",
+        "Warm, comforting, restorative, gentle reward",
+        "110 BPM in D Dorian",
+        "a crystal celesta and concert harp harmonics",
+        "Opens at time zero with a soft celesta note on D5 rising to A5 with a shimmering concert "
+        f"harp harmonic, {SPACE}, ringing out softly into silence.")),
+    ("gate_move", SFX, 2.0, 1.0, -6.0, 1, True, 0.25, caption(
+        "Orchestral Percussion Earcon / Heavy Iron Rumble",
+        "Heavy, mechanical, ancient, decisive",
+        "90 BPM in D Dorian",
+        "a low timpani roll, tubular bells and a muted iron anvil",
+        "Opens at time zero with a short low rumbling timpani roll on D2 and a heavy clank of a "
+        f"muted iron anvil with a low tubular bell, {SPACE}, settling into silence.")),
+    ("spike_trap", SFX, 1.5, 0.32, -9.0, 2, True, 0.08, caption(
+        "Metal Percussion Earcon / Sharp Scrape and Tap",
+        "Sharp, dangerous, warning",
+        "140 BPM in D Dorian",
+        "crotales played with a scraping bow and a small anvil",
+        "Opens at time zero with a very short sharp scrape of a bowed crotale on E6 and a dry small "
+        f"anvil tap, {SPACE}, very short, decaying into silence.")),
+    ("brazier_light", SFX, 3.0, 1.6, -4.0, 1, False, 0.5, caption(
+        "Chamber Earcon / Warm Rising Bloom",
+        "Hopeful, safe, warm, comforting rest",
+        "80 BPM in D Dorian",
+        "a concert harp, tubular bells and a solo cello",
+        "Opens at time zero with an upward concert harp glissando into a warm low tubular bell on D3 "
+        f"and a soft sustained cello open fifth, {SPACE}, blooming and fading gently into silence.")),
+    ("chest_open", SFX, 4.0, 2.0, -3.0, 1, False, 0.5, caption(
+        "Mallet Percussion Stinger / Treasure Discovery Arpeggio",
+        "Wondrous, rewarding, magical discovery",
+        "120 BPM in D Dorian",
+        "a celesta, an orchestral glockenspiel and a concert harp",
+        "Opens at time zero with a celesta and glockenspiel arpeggio rising D5, F5, A5, C6, D6 over "
+        f"a sweeping concert harp glissando, landing on a bright open fifth, {SPACE}, ringing out.")),
+    # ------------------------------------------------------------------ niveau 1 : boss
+    ("boss_roar", SFX, 3.0, 1.4, -2.0, 2, False, 0.3, caption(
+        "Orchestral Brass Swell / Monstrous Low Growl",
+        "Menacing, enormous, furious, gelatinous monster king",
+        "70 BPM in D Dorian",
+        "a tuba, a contrabassoon, low trombones and a timpani roll",
+        "Opens at time zero with a huge low brass growl from tuba, contrabassoon and trombones "
+        "fluttering on D1 and G sharp 1 over a rolling timpani crescendo, "
+        f"{SPACE}, cutting off into silence.")),
+    ("boss_slam", SFX, 1.5, 0.9, -2.0, 2, True, 0.2, caption(
+        "Orchestral Percussion Single Impact / Massive Ground Strike",
+        "Crushing, enormous, earth-shaking",
+        "80 BPM in D Dorian",
+        "a concert bass drum, orchestral timpani and a low piano string cluster",
+        "Opens at time zero with one massive strike on a concert bass drum and timpani on D1 "
+        f"together with a low piano string cluster, {SPACE}, rumbling out into silence.")),
+    ("victory", SFX, 6.0, 4.5, -2.0, 1, False, 1.2, caption(
+        "Orchestral Victory Stinger / Triumphant Fanfare",
+        "Triumphant, joyful, heroic relief, fairy-tale victory",
+        "126 BPM in D Dorian",
+        "warm French horns, trumpets, bodhran frame drums and a concert harp",
+        "Opens at time zero with bodhran hits and a bright French horn and trumpet fanfare rising "
+        "D4, A4, D5, F5, A5, landing on a radiant sustained D major chord with a harp glissando, "
+        f"{SPACE}, ringing out.")),
+    ("boss_theme", MUSIC, 120.0, None, -10.0, 1, False, 3.0, caption(
+        "Folk-Medieval Orchestral Boss Battle Soundtrack",
+        "Intense, dramatic, heroic, a giant crowned slime king in a torch-lit crypt",
+        "148 BPM (4/4 Time) in D Dorian",
+        "low brass, orchestral timpani, spiccato strings, a hurdy-gurdy and bodhran frame drums",
+        "Relentless and driving across the full duration. Opens with pounding timpani and bodhran "
+        "ostinato and low brass stabs, then spiccato strings and a gritty hurdy-gurdy play an urgent "
+        "D Dorian theme. The middle bridge raises the tension with French horn calls and tremolo "
+        "strings over a heavier drum pattern, keeping the mid range clear. The outro returns to the "
+        "main ostinato and ends on a sustained open D chord for seamless looping, in a large stone "
+        "crypt acoustic.")),
     # ------------------------------------------------------------------ musique
     ("combat_theme", MUSIC, 120.0, None, -10.0, 1, False, 3.0, caption(
         "Folk-Medieval Orchestral Battle Soundtrack",

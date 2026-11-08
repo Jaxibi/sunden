@@ -15,7 +15,26 @@ D:\dev\Godot_v4.7.2-stable_win64\Godot_v4.7.2-stable_win64.exe --path E:\dev\sun
 | Bouger    | ZQSD / WASD / flèches | stick gauche |
 | Attaquer (combo ×3) | J / clic gauche | X |
 | Esquiver  | Espace / K / clic droit | A |
-| Recommencer | R | Start |
+| Réapparaître au brasero (après une chute) | R | Start |
+
+## Niveau 1 : « La Crypte Gluante »
+
+Forêt de Sunden (tutoriel) → Crypte d'Émeraude (4 salles en boucle, alcôve secrète) → le Roi Gluant.
+Intentions, plan, rythme et chiffres : [LEVEL_DESIGN.md](LEVEL_DESIGN.md).
+
+- `tools/compose_level1.py` dessine la carte en ASCII (1 case = 1 m), vérifie que tout est atteignable
+  et écrit `levels/niveau1.json` (carte + herses, rencontres, boss, zones, indices, coffres).
+  Le JSON se modifie aussi à la main ; la légende des caractères est en tête du script.
+- `blender/build_props.py` exporte les décors et objets (`assets/models/props.glb`).
+- `scripts/level/level_builder.gd` construit le niveau depuis le JSON : sols, murs (bas côté caméra),
+  arbres et herbe en MultiMesh, objets, ennemis, chemin A* pour les monstres, zones et indices.
+- `scripts/level/` : `encounter.gd` (salle fermée à vagues), `gate.gd` (herse), `spike_trap.gd`,
+  `breakable.gd` (jarres, caisses), `heart_pickup.gd`, `brazier.gd` (point de retour),
+  `chest.gd`, `boss_slime.gd` (3 phases) et `shockwave.gd`.
+
+```bash
+python tools/compose_level1.py
+```
 
 ## Organisation
 
@@ -31,7 +50,7 @@ D:\dev\Godot_v4.7.2-stable_win64\Godot_v4.7.2-stable_win64.exe --path E:\dev\sun
 - `shaders/toon.gdshader` : ombrage en paliers (mêmes teintes que dans Blender).
 - `shaders/outline.gdshader` : contour d'un pixel (profondeur + normales).
 - `scripts/pixel_camera.gd` : caméra orthographique alignée sur la grille de pixels, décalage sous-pixel, tremblements.
-- `scripts/main.gd` : agrandissement entier, vagues d'ennemis, contrôles.
+- `scripts/main.gd` : agrandissement entier, déroulement du niveau (brasero, réapparition, musique), contrôles.
 - `scripts/hero.gd`, `scripts/enemy.gd` : combat (combo, esquive, télégraphes, recul).
 - `scripts/stepped_animator.gd` : lecture des animations par paliers, recalage sur les durées de jeu.
 - `scripts/juice.gd` : arrêt sur image, tremblement, éclats.
@@ -93,7 +112,15 @@ Durées :
 
 ## Tests
 
+- `--selftest` (sans fenêtre) : héros invincible ; casse des jarres, vide la 1re salle, bat le boss,
+  et affiche un bilan (herses rouvertes, sortie ouverte…).
+- `--screenshot=renders/visite.png` : visite du niveau en captures (`visite_1.png`, `visite_2.png`…),
+  boss compris.
+
 ```bash
 Godot_v4.7.2-stable_win64_console.exe --headless --path . -- --selftest
-Godot_v4.7.2-stable_win64_console.exe --path . -- --screenshot=renders/capture.png
+```
+
+```bash
+Godot_v4.7.2-stable_win64_console.exe --path . -- --screenshot=renders/visite.png
 ```

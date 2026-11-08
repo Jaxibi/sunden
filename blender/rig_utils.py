@@ -8,8 +8,9 @@
 Les poses sont écrites autour des axes de l'armature (X = droite du personnage, Y = avant, Z = haut),
 en degrés, relativement au parent. Le personnage regarde +Y (Blender) = -Z (Godot).
 """
+import math
 import os
-from math import radians
+from math import cos, radians, sin, pi
 
 import bmesh
 import bpy
@@ -58,8 +59,183 @@ class Rig:
         self.body = None
 
     # ------------------------------------------------------------------ maillage
+    @staticmethod
+    def _ring_prism(bm, rings, matrix, smooth=True):
+        """Construit un volume fermé à partir d'une liste d'anneaux [(x, y, z), ...] de même taille."""
+        verts = []
+        ring_verts = []
+        for r in rings:
+            rv = [bm.verts.new(matrix @ Vector(pt)) for pt in r]
+            verts.extend(rv)
+            ring_verts.append(rv)
+        n = len(rings[0])
+        faces = []
+        for r0, r1 in zip(ring_verts[:-1], ring_verts[1:]):
+            for i in range(n):
+                j = (i + 1) % n
+                faces.append(bm.faces.new((r0[i], r0[j], r1[j], r1[i])))
+        # Bouchons bas et haut
+        bot_c = sum((v.co for v in ring_verts[0]), Vector()) / n
+        top_c = sum((v.co for v in ring_verts[-1]), Vector()) / n
+        vb = bm.verts.new(bot_c)
+        vt = bm.verts.new(top_c)
+        verts.extend([vb, vt])
+        for i in range(n):
+            j = (i + 1) % n
+            faces.append(bm.faces.new((ring_verts[0][j], ring_verts[0][i], vb)))
+            faces.append(bm.faces.new((ring_verts[-1][i], ring_verts[-1][j], vt)))
+        for f in faces:
+            f.smooth = smooth
+        return verts, faces
+
+    @classmethod
+    def _create_shape(cls, bm, p, matrix):
+        shape = p.get("shape", "box")
+        smooth = p.get("smooth", shape in ("sphere", "rounded_box", "limb", "dome", "cape"))
+        if shape == "sphere":
+            res = bmesh.ops.create_uvsphere(bm, u_segments=p.get("segments", 10),
+                                            v_segments=p.get("rings", 6), radius=1.0, matrix=matrix)
+            verts = res["verts"]
+            faces = list({f for v in verts for f in v.link_faces})
+            for f in faces:
+                f.smooth = smooth
+            return verts, faces
+
+        if shape in ("rounded_box", "limb"):
+            n = p.get("segments", 10 if shape == "rounded_box" else 8)
+            power = p.get("power", 0.68 if shape == "rounded_box" else 0.95)
+            bx, by = p.get("bottom", (1.0, 1.0))
+            tx, ty = p.get("top", (1.0, 1.0))
+            mx, my = p.get("mid", ((bx + tx) * 0.5, (by + ty) * 0.5))
+            bev = p.get("bevel", 0.16 if shape == "rounded_box" else 0.10)
+            bend_x, bend_y = p.get("bend", (0.0, 0.0))
+            profile = [
+                (-0.50, bx * (1.0 - bev * 0.9), by * (1.0 - bev * 0.9), 0.0, 0.0),
+                (-0.50 + bev * 0.7, bx, by, bend_x * 0.2, bend_y * 0.2),
+                (0.00, mx, my, bend_x, bend_y),
+                (0.50 - bev * 0.7, tx, ty, bend_x * 0.2, bend_y * 0.2),
+                (0.50, tx * (1.0 - bev * 0.9), ty * (1.0 - bev * 0.9), 0.0, 0.0),
+            ]
+            rings = []
+            for z, sx, sy, ox, oy in profile:
+                ring = []
+                for i in range(n):
+                    a = 2.0 * pi * i / n + pi / n
+                    ca, sa = cos(a), sin(a)
+                    x = 0.5 * sx * math.copysign(abs(ca) ** power, ca) + ox
+                    y = 0.5 * sy * math.copysign(abs(sa) ** power, sa) + oy
+                    ring.append((x, y, z))
+                rings.append(ring)
+            return cls._ring_prism(bm, rings, matrix, smooth=smooth)
+
+        if shape == "dome":
+            n = p.get("segments", 10)
+            power = p.get("power", 0.85)
+            flare = p.get("flare", 1.0)
+            profile = [
+                (-0.50, 0.92 * flare, 0.92 * flare),
+                (-0.20, 1.00 * flare, 1.00 * flare),
+                (0.15, 0.86, 0.86),
+                (0.40, 0.58, 0.58),
+                (0.50, 0.22, 0.22),
+            ]
+            rings = []
+            for z, sx, sy in profile:
+                ring = []
+                for i in range(n):
+                    a = 2.0 * pi * i / n + pi / n
+                    ca, sa = cos(a), sin(a)
+                    x = 0.5 * sx * math.copysign(abs(ca) ** power, ca)
+                    y = 0.5 * sy * math.copysign(abs(sa) ** power, sa)
+                    ring.append((x, y, z))
+                rings.append(ring)
+            return cls._ring_prism(bm, rings, matrix, smooth=smooth)
+
+        if shape == "blade":
+            # Lame en losange le long de +Y, large et biseautée jusqu'à la pointe
+            sections = [
+                (-0.50, 0.36, 0.42),
+                (-0.15, 0.46, 0.48),
+                (0.22, 0.50, 0.42),
+                (0.40, 0.26, 0.25),
+            ]
+            verts = []
+            ring_verts = []
+            for y, w, t in sections:
+                pts = [(-w, y, 0.0), (0.0, y, t), (w, y, 0.0), (0.0, y, -t)]
+                rv = [bm.verts.new(matrix @ Vector(pt)) for pt in pts]
+                verts.extend(rv)
+                ring_verts.append(rv)
+            tip = bm.verts.new(matrix @ Vector((0.0, 0.50, 0.0)))
+            base = bm.verts.new(matrix @ Vector((0.0, -0.50, 0.0)))
+            verts.extend([tip, base])
+            faces = []
+            for r0, r1 in zip(ring_verts[:-1], ring_verts[1:]):
+                for i in range(4):
+                    j = (i + 1) % 4
+                    faces.append(bm.faces.new((r0[i], r1[i], r1[j], r0[j])))
+            for i in range(4):
+                j = (i + 1) % 4
+                faces.append(bm.faces.new((ring_verts[-1][i], tip, ring_verts[-1][j])))
+                faces.append(bm.faces.new((ring_verts[0][j], base, ring_verts[0][i])))
+            for f in faces:
+                f.smooth = False
+            return verts, faces
+
+        if shape == "shield":
+            # Écu incurvé (face vers -X sur l'avant-bras gauche), large en haut et pointu en bas
+            profile = [
+                (-0.50, 0.08, 0.06),
+                (-0.32, 0.56, -0.10),
+                (-0.05, 0.92, -0.16),
+                (0.28, 1.00, -0.14),
+                (0.50, 0.86, 0.00),
+            ]
+            rings = []
+            for z, wy, arch_x in profile:
+                hw = 0.5 * wy
+                rings.append([
+                    (-0.50 + arch_x, 0.0, z),
+                    (-0.22 + arch_x * 0.5, hw * 0.65, z),
+                    (0.15, hw, z),
+                    (0.45, hw * 0.75, z),
+                    (0.50, 0.0, z),
+                    (0.45, -hw * 0.75, z),
+                    (0.15, -hw, z),
+                    (-0.22 + arch_x * 0.5, -hw * 0.65, z),
+                ])
+            return cls._ring_prism(bm, rings, matrix, smooth=False)
+
+        if shape == "cape":
+            # Cape trapézoïdale plissée, évasée vers le bas et courbée
+            profile = [
+                (-0.50, 1.15, -0.25),
+                (-0.20, 1.02, -0.12),
+                (0.15, 0.86, 0.0),
+                (0.50, 0.68, 0.08),
+            ]
+            rings = []
+            for z, wx, cy in profile:
+                hw = 0.5 * wx
+                rings.append([
+                    (-hw, cy + 0.18, z),
+                    (-hw * 0.5, cy - 0.35, z),
+                    (0.0, cy - 0.50, z),
+                    (hw * 0.5, cy - 0.35, z),
+                    (hw, cy + 0.18, z),
+                    (hw * 0.5, cy + 0.45, z),
+                    (0.0, cy + 0.30, z),
+                    (-hw * 0.5, cy + 0.45, z),
+                ])
+            return cls._ring_prism(bm, rings, matrix, smooth=True)
+
+        res = bmesh.ops.create_cube(bm, size=1.0, matrix=matrix)
+        verts = res["verts"]
+        faces = list({f for v in verts for f in v.link_faces})
+        return verts, faces
+
     def build_mesh(self, parts):
-        """parts : dicts {shape: box|sphere, size, center, mat, bone | weights(co)->{os: poids}, rot?, segments?, rings?}"""
+        """parts : dicts {shape, size, center, mat, bone | weights(co)->{os: poids}, rot?, ...}"""
         me = bpy.data.meshes.new(self.arm.name + "_Mesh")
         body = bpy.data.objects.new(self.arm.name + "_Mesh", me)
         bpy.context.scene.collection.objects.link(body)
@@ -75,18 +251,15 @@ class Rig:
         for p in parts:
             rot = Euler([radians(a) for a in p.get("rot", (0, 0, 0))]).to_quaternion()
             m = Matrix.LocRotScale(Vector(p["center"]), rot, Vector(p["size"]))
-            if p.get("shape", "box") == "sphere":
-                res = bmesh.ops.create_uvsphere(bm, u_segments=p.get("segments", 8),
-                                                v_segments=p.get("rings", 5), radius=1.0, matrix=m)
-            else:
-                res = bmesh.ops.create_cube(bm, size=1.0, matrix=m)
-            for v in res["verts"]:
+            verts, faces = self._create_shape(bm, p, m)
+            for v in verts:
                 weights = p["weights"](v.co) if "weights" in p else {p["bone"]: 1.0}
                 for b, w in weights.items():
                     if w > 0.0:
                         v[deform][groups[b]] = w
-            for f in {f for v in res["verts"] for f in v.link_faces}:
+            for f in faces:
                 f.material_index = mat_index[p["mat"]]
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
         bm.to_mesh(me)
         bm.free()
         body.parent = self.arm

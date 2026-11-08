@@ -1,0 +1,443 @@
+{
+ "name": "La Crypte Gluante",
+ "map": [
+  "############################################################",
+  "############################################t______t########",
+  "############################################___C____########",
+  "###t____________t###########################________########",
+  "###_%_____4______##############################__###########",
+  "###______%_______##############################==###########",
+  "###___P______p___#######################t_______t_______t###",
+  "###______________#######################_%_______________###",
+  "###__4__%___4____=________##############_________________###",
+  "###____________%_=__%_____##############___P_________P___###",
+  "###______4_______#######__##############_________________###",
+  "###___p______P___#######__##############_________________###",
+  "###_%_________4__#######__##############_________________###",
+  "###__4_____%_____#######__##############_________________###",
+  "###t____________t#######__##############________K________###",
+  "#########__#############__##############_________________###",
+  "#########==#############__##############_________________###",
+  "#########__#############==##############_________________###",
+  "###_t__________t_#####t__________t######_________________###",
+  "###___3_____3____#####__________o_######_________________###",
+  "###_____________o#####__P__2___P__######_________________###",
+  "###__^^^^^^^^^^__#####____________######_________________###",
+  "###__^^^^^^^^^^__#####____2_______######___P_________P___###",
+  "###______________=___=_______2____=____=_________________###",
+  "###o____3____3___=___=___2________=____=_______________%_###",
+  "###______________#####____________######t_______________t###",
+  "###__^^^^^^^^^^__#####________2___##########################",
+  "###__^^^^^^^^^^__#####__P__B___P__##########################",
+  "###___3__________#####_o________o_##########################",
+  "###_t__________t_#####t__________t##########################",
+  "######__###################==###############################",
+  "######^^###################__###############################",
+  "######^^#####TTTTTTTTTTTTTT==TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+  "######__#####TTTTTTTTTTo...............TTTTTTTTTTTTTTTTTTTTT",
+  "###o__t___o##TTTTTTTTTT.1.t..B.1t....1.TTTTTTTTTTTTTTTTTTTTT",
+  "###________##TTTTTTTTTT..P..______..P..TTTTTTTTTTTTTTTTTTTTT",
+  "###_k____k_##TTTTTTTTTT.....______.....TTTTTTTTTTTTTTTTTTTTT",
+  "###________##TTTTTTTTTTo...._____1.....TTTTTTTTTTTTTTTTTTTTT",
+  "###_c_C__c_##TTTTTTTTTT.....______.....TTTTTTTTTTTTTTTTTTTTT",
+  "###o______o##TTTTTTTTTT..P..______..p..TTTTTTTTTTTTTTTTTTTTT",
+  "#############TTTTTTTTTT.1..............TTTTTTTTTTTTTTTTTTTTT",
+  "#############TTTTTTTTTTTTTTTTTTTTTT#====#TTTTTTTTTTTTTTTTTTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT#,,,,#TTTTTTTTTTTTTTTTTTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT#^^^^#TTTTTTTTTTTTTTTTTTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT#^^^^#TTTTTTTTTTTTTTTTTTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT#,,,,#TTTTTTTTTTTTTTTTTTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT#t,,t#TTTTTTTTTTTTTTTTTTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTr........TTTTTTTTTTTTTTTTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT.........TTTTTTTTTTTTTTTTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT..,s,,,..TTTTTTTTTTTTTTTTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT..,,,,,.rTTTTTTTTTTTTTTTTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT..,,,,,..TTTTTTTTTTTTTTTTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT..,,,,,..TTTTTTTTTTTTTTTTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT.o.......TT............TTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT.........TT.r........r.TTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT,,,o,,o,,,,L,,,....TTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT,,,,c,,,,,,,,,,....TTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT,,o,,o,,,,,,,,S....TTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT..,,,,,,....TTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT..........r.TTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT............TTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+  "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"
+ ],
+ "gates": {
+  "e1_in": {
+   "cells": [
+    [
+     36,
+     41
+    ],
+    [
+     37,
+     41
+    ],
+    [
+     38,
+     41
+    ],
+    [
+     39,
+     41
+    ]
+   ],
+   "open": true
+  },
+  "e1_out": {
+   "cells": [
+    [
+     27,
+     32
+    ],
+    [
+     28,
+     32
+    ]
+   ],
+   "open": false
+  },
+  "hall_s": {
+   "cells": [
+    [
+     27,
+     30
+    ],
+    [
+     28,
+     30
+    ]
+   ],
+   "open": true
+  },
+  "spk": {
+   "cells": [
+    [
+     17,
+     23
+    ],
+    [
+     17,
+     24
+    ]
+   ],
+   "open": true
+  },
+  "hall_w": {
+   "cells": [
+    [
+     21,
+     23
+    ],
+    [
+     21,
+     24
+    ]
+   ],
+   "open": true
+  },
+  "oss": {
+   "cells": [
+    [
+     9,
+     16
+    ],
+    [
+     10,
+     16
+    ]
+   ],
+   "open": true
+  },
+  "oss_e": {
+   "cells": [
+    [
+     17,
+     8
+    ],
+    [
+     17,
+     9
+    ]
+   ],
+   "open": true
+  },
+  "short": {
+   "cells": [
+    [
+     24,
+     17
+    ],
+    [
+     25,
+     17
+    ]
+   ],
+   "open": false
+  },
+  "boss": {
+   "cells": [
+    [
+     34,
+     23
+    ],
+    [
+     34,
+     24
+    ]
+   ],
+   "open": false
+  },
+  "arena": {
+   "cells": [
+    [
+     39,
+     23
+    ],
+    [
+     39,
+     24
+    ]
+   ],
+   "open": true
+  },
+  "exit": {
+   "cells": [
+    [
+     47,
+     5
+    ],
+    [
+     48,
+     5
+    ]
+   ],
+   "open": false
+  }
+ },
+ "encounters": [
+  {
+   "id": "e1",
+   "name": "La Clairière",
+   "marker": "1",
+   "rect": [
+    24,
+    34,
+    37,
+    40
+   ],
+   "gates": [
+    "e1_in",
+    "e1_out"
+   ],
+   "open_on_clear": [],
+   "hint": "Enchaîne 3 coups : le 3e tournoie autour de toi",
+   "waves": [
+    {
+     "slime": 2
+    },
+    {
+     "slime": 3
+    }
+   ]
+  },
+  {
+   "id": "e2",
+   "name": "Le Vestibule",
+   "marker": "2",
+   "rect": [
+    23,
+    19,
+    32,
+    28
+   ],
+   "gates": [
+    "hall_s",
+    "hall_w"
+   ],
+   "open_on_clear": [],
+   "hint": "Le squelette lève son épée avant de frapper : roule sous le coup",
+   "waves": [
+    {
+     "skeleton": 1
+    },
+    {
+     "skeleton": 1,
+     "slime": 2
+    }
+   ]
+  },
+  {
+   "id": "e3",
+   "name": "La Salle des Piques",
+   "marker": "3",
+   "rect": [
+    4,
+    19,
+    15,
+    28
+   ],
+   "gates": [
+    "spk"
+   ],
+   "open_on_clear": [],
+   "hint": "Les piques blessent aussi les monstres",
+   "waves": [
+    {
+     "slime": 3
+    },
+    {
+     "skeleton": 2,
+     "slime": 1
+    }
+   ]
+  },
+  {
+   "id": "e4",
+   "name": "L'Ossuaire",
+   "marker": "4",
+   "rect": [
+    4,
+    4,
+    15,
+    13
+   ],
+   "gates": [
+    "oss",
+    "oss_e"
+   ],
+   "open_on_clear": [
+    "short",
+    "boss"
+   ],
+   "clear_message": "Un sceau se brise dans le hall...",
+   "waves": [
+    {
+     "skeleton": 2,
+     "slime": 2
+    },
+    {
+     "skeleton": 2,
+     "slime": 3
+    }
+   ]
+  }
+ ],
+ "boss": {
+  "rect": [
+   41,
+   7,
+   55,
+   24
+  ],
+  "gates": [
+   "arena"
+  ],
+  "open_on_victory": [
+   "arena",
+   "exit"
+  ],
+  "name": "Le Roi Gluant"
+ },
+ "zones": [
+  {
+   "name": "Crypte d'Émeraude",
+   "rect": [
+    0,
+    30,
+    12,
+    41
+   ],
+   "sun": 0.55,
+   "music": "dungeon"
+  },
+  {
+   "name": "Forêt de Sunden",
+   "rect": [
+    13,
+    32,
+    59,
+    63
+   ],
+   "sun": 1.0,
+   "music": "forest"
+  },
+  {
+   "name": "Trône du Roi Gluant",
+   "rect": [
+    40,
+    0,
+    59,
+    25
+   ],
+   "sun": 0.42,
+   "music": "dungeon"
+  },
+  {
+   "name": "Crypte d'Émeraude",
+   "rect": [
+    0,
+    0,
+    39,
+    31
+   ],
+   "sun": 0.55,
+   "music": "dungeon"
+  }
+ ],
+ "hints": [
+  {
+   "rect": [
+    45,
+    53,
+    56,
+    60
+   ],
+   "text": "ZQSD / stick gauche : se déplacer"
+  },
+  {
+   "rect": [
+    38,
+    54,
+    46,
+    58
+   ],
+   "text": "J / clic gauche : frapper (les jarres cachent des cœurs)"
+  },
+  {
+   "rect": [
+    34,
+    47,
+    42,
+    54
+   ],
+   "text": "Un slime ! Il se tasse avant de bondir : écarte-toi puis frappe"
+  },
+  {
+   "rect": [
+    36,
+    45,
+    39,
+    46
+   ],
+   "text": "Espace / clic droit : roulade, invulnérable un instant"
+  },
+  {
+   "rect": [
+    6,
+    30,
+    7,
+    33
+   ],
+   "text": "Les piques ont un rythme... ou une roulade"
+  }
+ ],
+ "chests": {
+  "6,38": "bottes",
+  "47,2": "fin"
+ }
+}

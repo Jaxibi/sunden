@@ -60,7 +60,9 @@ func _setup_environment() -> void:
 	sun.name = "Soleil"
 	sun.shadow_enabled = true
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-	sun.directional_shadow_max_distance = 45.0
+	sun.directional_shadow_max_distance = 18.0
+	sun.shadow_bias = 0.02
+	sun.shadow_normal_bias = 1.0
 	add_child(sun)
 	sun.look_at(sun.global_position + SUN_DIRECTION.normalized(), Vector3.UP)
 

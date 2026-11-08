@@ -1,32 +1,29 @@
 extends Node
-## Scène principale : rendu basse résolution agrandi en entier, vagues d'ennemis, contrôles.
+## Scène principale : rendu basse résolution agrandi en entier, déroulement du niveau, contrôles.
 ##
 ## Options de lancement (après `--`) :
-##   --screenshot=chemin.png   capture une image pendant un coup d'épée puis quitte
-##   --selftest                attaque en boucle 14 s, affiche le bilan puis quitte
+##   --screenshot=chemin.png   visite du niveau en captures (chemin_1.png, chemin_2.png...) puis quitte
+##   --selftest                parcours automatique (objets, 1re salle, boss) avec bilan, puis quitte
 
 const NATIVE := Vector2i(320, 180)
 const MARGIN := 1                      # pixels en plus autour de l'image pour le décalage sous-pixel
-const ARENA_LIMIT := 11.0
-const SLIME := preload("res://scenes/slime.tscn")
-const SKELETON := preload("res://scenes/skeleton.tscn")
+const RESPAWN_DELAY := 3.0
 
 @onready var display: SubViewportContainer = $Display
 @onready var game: SubViewport = $Display/Game
 @onready var camera: PixelCamera = $Display/Game/Camera
 @onready var hero: Hero = $Display/Game/Hero
 @onready var enemies: Node3D = $Display/Game/Enemies
+@onready var level: LevelBuilder = $Display/Game/Level
 @onready var hud: Hud = $HUD
 
 var pixel_scale := 4
-var wave := 0
-var kills := 0
+var checkpoint := Vector3.ZERO
 
 var _base_pos := Vector2.ZERO
-var _next_wave_in := 1.0
+var _respawn_in := -1.0
+var _finished := false
 var _shot_path := ""
-var _selftest := false
-var _start_msec := 0
 
 
 func _ready() -> void:
@@ -35,32 +32,39 @@ func _ready() -> void:
 	Juice.fx_root = game
 	get_tree().root.size_changed.connect(_layout)
 	_layout()
+
+	level.setup(hero, enemies)
+	hero.global_position = level.start_position
+	checkpoint = level.start_position
+	camera.snap()
+
 	hero.health_changed.connect(hud.set_health)
 	hero.died.connect(_on_hero_died)
 	hud.set_health(hero.hp, hero.max_hp)
-	hud.set_wave(wave, kills)
-	Sound.play_music("combat_theme")
+	level.zone_changed.connect(func(zone): hud.set_zone(String(zone["name"])))
+	level.hint_requested.connect(func(text): hud.hint(text))
+	level.encounter_started.connect(_on_encounter_started)
+	level.encounter_cleared.connect(_on_encounter_cleared)
+	level.checkpoint_reached.connect(_on_checkpoint)
+	level.boss_started.connect(_on_boss_started)
+	level.boss_defeated.connect(_on_boss_defeated)
+	level.chest_opened.connect(_on_chest_opened)
 	Sound.play_ambience("forest_ambience")
-	_start_msec = Time.get_ticks_msec()
+
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot="):
 			_shot_path = arg.get_slice("=", 1)
-			_run_screenshot()
+			_run_tour()
 		elif arg == "--selftest":
-			_selftest = true
 			_run_selftest()
 
 
 func _process(delta: float) -> void:
 	display.position = _base_pos + camera.subpixel * pixel_scale
-	if hero.state != Hero.State.DEAD and get_tree().get_nodes_in_group("enemies").is_empty():
-		_next_wave_in -= delta
-		if _next_wave_in <= 0.0:
-			_spawn_wave()
-			_next_wave_in = 2.0
-	if hero.state == Hero.State.DEAD and Input.is_action_just_pressed("restart"):
-		Engine.time_scale = 1.0
-		get_tree().reload_current_scene()
+	if hero.state == Hero.State.DEAD:
+		_respawn_in -= delta
+		if _respawn_in <= 0.0 or (_respawn_in < RESPAWN_DELAY - 0.8 and Input.is_action_just_pressed("restart")):
+			_respawn()
 
 
 ## Facteur d'agrandissement entier le plus grand qui tient dans la fenêtre.
@@ -74,43 +78,79 @@ func _layout() -> void:
 	hud.set_pixel_scale(pixel_scale, origin)
 
 
-# --------------------------------------------------------------------------- vagues
-func _spawn_wave() -> void:
-	wave += 1
-	for i in 2 + wave:
-		_spawn(SLIME, _random_spawn_point())
-	for i in wave / 2:
-		_spawn(SKELETON, _random_spawn_point())
-	hud.announce("Vague %d" % wave)
-	hud.set_wave(wave, kills)
+# --------------------------------------------------------------------------- déroulement
+func _on_encounter_started(enc: Encounter) -> void:
+	hud.announce(enc.display_name(), 1.6)
+	var tip := String(enc.config.get("hint", ""))
+	if tip != "":
+		hud.hint(tip, 7.0)
 	Sound.play("wave_start")
+	Sound.play_music("combat_theme", 0.8)
 
 
-func _random_spawn_point() -> Vector3:
-	var ang := randf() * TAU
-	var r := randf_range(5.5, 8.0)
-	var p := hero.global_position + Vector3(cos(ang) * r, 0.0, sin(ang) * r)
-	return Vector3(clampf(p.x, -ARENA_LIMIT, ARENA_LIMIT), 0.0, clampf(p.z, -ARENA_LIMIT, ARENA_LIMIT))
+func _on_encounter_cleared(enc: Encounter) -> void:
+	hud.announce(String(enc.config.get("clear_message", "Salle libérée")), 2.2)
+	Sound.stop_music(3.0)
 
 
-func _spawn(scene: PackedScene, pos: Vector3) -> Enemy:
-	var e: Enemy = scene.instantiate()
-	e.position = pos
-	e.target = hero
-	e.died.connect(_on_enemy_died)
-	enemies.add_child(e)
-	return e
+func _on_checkpoint(b: Brazier) -> void:
+	checkpoint = b.respawn_point
+	hud.announce("Feu ravivé", 1.8)
+	hud.hint("Tes forces reviennent. Si tu tombes, tu repartiras d'ici.", 5.0)
 
 
-func _on_enemy_died(_e: Enemy) -> void:
-	kills += 1
-	hud.set_wave(wave, kills)
+func _on_boss_started(b: BossSlime) -> void:
+	hud.show_boss(b.display_name)
+	hud.announce(b.display_name, 2.2)
+	if not b.health_changed.is_connected(hud.set_boss):
+		b.health_changed.connect(hud.set_boss)
+		b.phase_changed.connect(_on_boss_phase)
+	Sound.play_music("boss_theme", 0.5)
+
+
+func _on_boss_phase(phase: int) -> void:
+	match phase:
+		2:
+			hud.hint("Son onde de choc ne se fuit pas : traverse-la en roulade !", 7.0)
+		3:
+			hud.announce("Le Roi enrage !", 1.6)
+			hud.hint("Trois écrasements de suite... puis il s'effondre : frappe !", 7.0)
+
+
+func _on_boss_defeated(_b: BossSlime) -> void:
+	hud.hide_boss()
+	hud.announce("Le Roi Gluant est vaincu !", 3.5)
+	hud.hint("Sa salle du trésor s'est ouverte.", 6.0)
+	Sound.stop_music(1.0)
+	Sound.play("victory")
+
+
+func _on_chest_opened(reward: String) -> void:
+	match reward:
+		"bottes":
+			hero.dodge_strike = true
+			hud.announce("Bottes de rafale !", 2.5)
+			hud.hint("Ta roulade frappe et repousse désormais les monstres.", 8.0)
+		"fin":
+			_finished = true
+			hud.announce("Fin du niveau 1 - merci d'avoir joué !", 0.0)
+			Sound.play("victory")
 
 
 func _on_hero_died() -> void:
-	hud.announce("Tu es tombe  -  R pour recommencer", 0.0)
+	hud.announce("Tu es tombé...", RESPAWN_DELAY)
+	hud.hide_boss()
 	Sound.stop_music(1.2)
 	Sound.play("hero_death")
+	_respawn_in = RESPAWN_DELAY
+
+
+func _respawn() -> void:
+	Engine.time_scale = 1.0
+	level.on_hero_respawn()
+	hero.respawn(checkpoint)
+	camera.snap()
+	hud.announce("", 0.1)
 
 
 # --------------------------------------------------------------------------- contrôles
@@ -168,50 +208,98 @@ func _press(action: String) -> void:
 	Input.action_release(action)
 
 
-func _run_screenshot() -> void:
-	_next_wave_in = INF
-	wave = 1
-	var f := hero.facing
-	var side := Vector3(-f.z, 0.0, f.x)
-	_spawn(SLIME, hero.global_position + f * 1.5 + side * 0.3)
-	_spawn(SLIME, hero.global_position + f * 3.0 - side * 1.6)
-	_spawn(SKELETON, hero.global_position - f * 2.2 + side * 2.2)
-	_spawn(SKELETON, hero.global_position + f * 3.2 + side * 2.5)
-	hud.set_wave(wave, kills)
-	# enregistre aussi ce que joue le bus Master (contrôle du sound design)
-	var rec := AudioEffectRecord.new()
-	AudioServer.add_bus_effect(0, rec)
-	rec.set_recording_active(true)
-	await _wait_real(0.9)
-	# Série d'images pendant le combo : chemin.png, chemin_1.png, chemin_2.png...
-	for i in 16:
-		if i == 0 or i == 4 or i == 7:
+func _teleport(cell: Vector2i) -> void:
+	hero.global_position = level.cell_center(cell.x, cell.y)
+	camera.snap()
+
+
+func _shot(index: int) -> void:
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(_shot_path.get_basename() + "_%d.png" % index)
+
+
+## Visite en captures : départ, passage piégé, 1re salle, hall, piques, ossuaire, boss.
+func _run_tour() -> void:
+	hero.god_mode = true
+	var stops := [Vector2i(50, 57), Vector2i(41, 56), Vector2i(37, 47), Vector2i(31, 38),
+		Vector2i(27, 25), Vector2i(10, 24), Vector2i(9, 9), Vector2i(6, 37)]
+	await _wait_real(1.0)
+	for i in stops.size():
+		_teleport(stops[i])
+		await _wait_real(1.6)
+		for k in 2:
 			_press("attack")
-		await _wait_real(0.07 if i < 10 else 0.2)
-		await RenderingServer.frame_post_draw
-		var path := _shot_path if i == 0 else _shot_path.get_basename() + "_%d.png" % i
-		get_viewport().get_texture().get_image().save_png(path)
-	await _wait_real(2.0)
-	rec.set_recording_active(false)
-	var audio := rec.get_recording()
-	if audio:
-		audio.save_to_wav(_shot_path.get_basename() + "_audio.wav")
-	audio = null
-	AudioServer.remove_bus_effect(0, AudioServer.get_bus_effect_count(0) - 1)
+			await _wait_real(0.12)
+		await _shot(i + 1)
+	# boss : directement en phase 2 pour voir l'onde de choc et les mini-slimes
+	level.boss.hp = 22.0
+	level.boss.phase = 2
+	_teleport(Vector2i(46, 18))
+	var t := 0.0
+	while level.boss.state != BossSlime.State.AIR and t < 8.0:
+		await _wait_real(0.1)
+		t += 0.1
+	await _wait_real(0.45)
+	await _shot(stops.size() + 1)
+	while level.boss.state != BossSlime.State.LANDED and t < 12.0:
+		await _wait_real(0.05)
+		t += 0.05
+	await _wait_real(0.2)
+	await _shot(stops.size() + 2)
+	await _wait_real(0.6)
+	await _shot(stops.size() + 3)
 	print("SCREENSHOT ", _shot_path)
 	Sound.quit_cleanly()
 
 
+## Parcours automatique (héros invincible) : objets, première salle, boss. Affiche un bilan.
 func _run_selftest() -> void:
-	for scene in [load("res://scenes/hero.tscn"), SLIME, SKELETON]:
-		var inst: Node = scene.instantiate()
-		var player := inst.find_child("AnimationPlayer", true, false) as AnimationPlayer
-		print("SELFTEST %s animations=%s" % [inst.name, player.get_animation_list() if player else "AUCUNE"])
-		inst.free()
-	var end := Time.get_ticks_msec() + 14000
-	while Time.get_ticks_msec() < end and hero.state != Hero.State.DEAD:
+	hero.god_mode = true
+	var report := {"stats": level.stats, "herses": level.gates.size(), "rencontres": level.encounters.size(),
+		"apparitions": level.spawn_points.keys(), "boss": level.boss != null}
+	print("SELFTEST niveau ", JSON.stringify(report))
+	# 1) jarres du chemin
+	var before := get_tree().get_nodes_in_group("hittable").size()
+	_teleport(Vector2i(45, 55))
+	for i in 4:
 		await _press("attack")
-		await _wait_real(0.25)
-	print("SELFTEST wave=%d kills=%d hero_hp=%d enemies_alive=%d" % [
-		wave, kills, hero.hp, get_tree().get_nodes_in_group("enemies").size()])
+		await _wait_real(0.3)
+	print("SELFTEST jarres cassées : %d" % (before - get_tree().get_nodes_in_group("hittable").size()))
+	# 2) première salle
+	_teleport(Vector2i(30, 37))
+	var enc: Encounter = level.encounters[0]
+	var t0 := Time.get_ticks_msec()
+	var next_dbg := 0
+	while enc.phase != Encounter.Phase.CLEARED and Time.get_ticks_msec() - t0 < 45000:
+		await _press("attack")
+		await _wait_real(0.2)
+		if Time.get_ticks_msec() - t0 > next_dbg:
+			next_dbg += 5000
+			var info := []
+			for e in enc._alive:
+				if is_instance_valid(e):
+					info.append("%s pv%d %s d=%.1f" % [e.name, e.hp, Enemy.State.keys()[e.state],
+						e.global_position.distance_to(hero.global_position)])
+			print("SELFTEST salle 1 vague=%d attente=%d vivants=%s héros=%s" % [enc.wave, enc._pending, info,
+				hero.global_position])
+	print("SELFTEST salle 1 : %s en %.1f s, herses ouvertes : %s" % [
+		Encounter.Phase.keys()[enc.phase], (Time.get_ticks_msec() - t0) / 1000.0,
+		level.gates["e1_out"].is_open])
+	# 3) boss
+	level.set_gates(["boss"], true)
+	_teleport(Vector2i(46, 18))
+	t0 = Time.get_ticks_msec()
+	var last_print := 0
+	while level.boss.state != BossSlime.State.DEAD and Time.get_ticks_msec() - t0 < 150000:
+		await _press("attack")
+		await _wait_real(0.18)
+		var s := (Time.get_ticks_msec() - t0) / 1000
+		if s >= last_print + 15:
+			last_print = s
+			print("SELFTEST boss t=%ds pv=%.1f phase=%d état=%s" % [s, level.boss.hp, level.boss.phase,
+				BossSlime.State.keys()[level.boss.state]])
+	var duration := (Time.get_ticks_msec() - t0) / 1000.0
+	await _wait_real(1.5)                     # la sortie s'ouvre après l'animation de mort
+	print("SELFTEST boss : %s en %.1f s, sortie ouverte : %s" % [BossSlime.State.keys()[level.boss.state],
+		duration, level.gates["exit"].is_open])
 	Sound.quit_cleanly()

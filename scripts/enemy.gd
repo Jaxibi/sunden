@@ -27,8 +27,18 @@ const STAGGER_TIME := 0.35
 @export var move_anim := "saut"
 ## Cadence des animations (images par seconde). 0 = animation fluide.
 @export var anim_fps := 15.0
+## Distance à laquelle un ennemi posé dans le décor remarque le héros (INF = toujours).
+## Un coup reçu le réveille aussi.
+@export var aggro_range := INF
+## Échelle du modèle (mini-slimes du boss).
+@export var size_scale := 1.0
 
 var target: Hero
+## Niveau qui fournit le chemin (next_waypoint) ; sans lui, l'ennemi va tout droit.
+var nav: Node
+var _provoked := false
+var _waypoint := Vector3.ZERO
+var _repath_in := 0.0
 var hp := 0
 var state := State.SPAWN
 var state_time := 0.0
@@ -45,7 +55,9 @@ var _animator: SteppedAnimator
 
 func _ready() -> void:
 	hp = max_hp
+	radius *= size_scale
 	add_to_group("enemies")
+	add_to_group("hittable")
 	_mats = ToonMaterials.apply(model)
 	_animator = SteppedAnimator.new(model, anim_fps, ["repos", move_anim])
 	_set_state(State.SPAWN)
@@ -72,8 +84,10 @@ func _physics_process(delta: float) -> void:
 				_set_state(State.CHASE)
 		State.CHASE:
 			var desired := Vector3.ZERO
-			if target_ok:
-				desired = to_target.normalized() * move_speed + _separation()
+			if target_ok and not _provoked and dist <= aggro_range:
+				_provoked = true
+			if target_ok and _provoked:
+				desired = _chase_direction(delta) * move_speed + _separation()
 				_face(to_target, delta)
 				_animator.play(move_anim)
 				if dist <= attack_range:
@@ -125,6 +139,23 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 
+## Direction de poursuite : prochain point du chemin A* (contourne piliers et murs).
+func _chase_direction(delta: float) -> Vector3:
+	_repath_in -= delta
+	if nav == null:
+		_waypoint = target.global_position
+	elif _repath_in <= 0.0:
+		_repath_in = 0.25
+		_waypoint = nav.next_waypoint(global_position, target.global_position)
+	var d := _waypoint - global_position
+	d.y = 0.0
+	if d.length() < 0.15:
+		_repath_in = 0.0
+		d = target.global_position - global_position
+		d.y = 0.0
+	return d.normalized()
+
+
 func _separation() -> Vector3:
 	var push := Vector3.ZERO
 	for e in get_tree().get_nodes_in_group("enemies"):
@@ -155,7 +186,7 @@ func _set_state(s: State) -> void:
 				_animator.play("repos", true)
 				model.scale = Vector3.ONE * 0.05      # apparition par le code (slime)
 		State.CHASE:
-			model.scale = Vector3.ONE
+			model.scale = Vector3.ONE * size_scale
 			_animator.play(move_anim)
 		State.WINDUP:
 			_animator.play("preparation", true, windup_time)
@@ -179,6 +210,7 @@ func take_hit(amount: int, from_pos: Vector3, knockback: float) -> bool:
 	if state == State.DEAD or state == State.SPAWN:
 		return false
 	hp -= amount
+	_provoked = true
 	_flash = 0.1
 	var away := global_position - from_pos
 	away.y = 0.0
@@ -196,6 +228,7 @@ func take_hit(amount: int, from_pos: Vector3, knockback: float) -> bool:
 
 func _die() -> void:
 	remove_from_group("enemies")
+	remove_from_group("hittable")
 	collision_layer = 0
 	collision_mask = 1
 	died.emit(self)
@@ -207,12 +240,12 @@ func _die() -> void:
 		_flash = 0.1
 		_set_state(State.DEAD)
 		tw.tween_interval(_animator.length("mort") + 0.4)
-		tw.tween_property(model, "scale", Vector3(1.2, 0.05, 1.2), 0.1)
+		tw.tween_property(model, "scale", Vector3(1.2, 0.05, 1.2) * size_scale, 0.1)
 	else:
 		# le slime éclate
 		_flash = 10.0
 		_set_state(State.DEAD)
-		tw.tween_property(model, "scale", Vector3(1.4, 0.1, 1.4), 0.12)
+		tw.tween_property(model, "scale", Vector3(1.4, 0.1, 1.4) * size_scale, 0.12)
 	tw.tween_callback(queue_free)
 
 
@@ -240,4 +273,4 @@ func _process(delta: float) -> void:
 
 	if state == State.SPAWN and not _animator.has("apparition"):
 		var s := clampf(state_time / 0.4, 0.05, 1.0)
-		model.scale = Vector3.ONE * (s + sin(s * PI) * 0.25)
+		model.scale = Vector3.ONE * (s + sin(s * PI) * 0.25) * size_scale

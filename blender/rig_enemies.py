@@ -36,8 +36,8 @@ if WHICH not in ("slime", "squelette"):
 rig_utils.clean_scene()
 
 
-def box(size, center, mat, bone):
-    return {"size": size, "center": center, "mat": mat, "bone": bone}
+def part(shape, size, center, mat, bone, **kw):
+    return {"shape": shape, "size": size, "center": center, "mat": mat, "bone": bone, **kw}
 
 
 def build_slime():
@@ -56,9 +56,9 @@ def build_slime():
 
     slime.build_mesh([
         {"shape": "sphere", "size": (0.5, 0.5, 0.36), "center": (0, 0, 0.3), "mat": "Slime",
-         "weights": slime_weights, "segments": 8, "rings": 5},
-        box((0.07, 0.04, 0.12), (0.15, 0.44, 0.36), "Noir", "haut"),
-        box((0.07, 0.04, 0.12), (-0.15, 0.44, 0.36), "Noir", "haut"),
+         "weights": slime_weights, "segments": 12, "rings": 8, "smooth": True},
+        part("dome", (0.08, 0.06, 0.13), (0.15, 0.44, 0.36), "Noir", "haut", rot=(-90, 0, 0)),
+        part("dome", (0.08, 0.06, 0.13), (-0.15, 0.44, 0.36), "Noir", "haut", rot=(-90, 0, 0)),
     ])
 
 
@@ -107,26 +107,40 @@ def build_skeleton():
     skel = rig_utils.Rig("Squelette", SK_BONES)
 
     SK_PARTS = [
-        box((0.32, 0.16, 0.10), (0, 0, 0.52), "Os", "hanches"),
-        box((0.07, 0.07, 0.32), (0, 0, 0.74), "Os", "torse"),
-        box((0.30, 0.28, 0.24), (0, 0.02, 1.27), "Os", "tete"),
-        box((0.04, 0.02, 0.04), (0, 0.165, 1.2), "Noir", "tete"),
-        box((0.22, 0.20, 0.06), (0, 0.05, 1.12), "Os", "machoire"),
-        box((0.04, 0.14, 0.04), (0.27, 0.0, 0.55), "Cuir", "epee"),
-        box((0.18, 0.04, 0.04), (0.27, 0.08, 0.55), "Rouille", "epee"),
-        box((0.07, 0.75, 0.025), (0.27, 0.47, 0.55), "Rouille", "epee"),
+        # Bassin arrondi et colonne vertébrale profilée
+        part("rounded_box", (0.31, 0.18, 0.11), (0, 0, 0.52), "Os", "hanches",
+             top=(0.85, 0.85), bottom=(1.05, 1.05), bevel=0.25),
+        part("limb", (0.09, 0.09, 0.34), (0, -0.02, 0.74), "Os", "torse",
+             top=(1.1, 1.1), mid=(0.75, 0.75), bottom=(1.1, 1.1)),
+        # Crâne bombé, pommettes et mâchoire articulée
+        part("dome", (0.33, 0.31, 0.22), (0, 0.0, 1.30), "Os", "tete", flare=1.04),
+        part("rounded_box", (0.28, 0.26, 0.14), (0, 0.03, 1.21), "Os", "tete",
+             bottom=(0.78, 0.82), top=(1.0, 1.0), bevel=0.26),
+        part("rounded_box", (0.045, 0.03, 0.05), (0, 0.165, 1.20), "Noir", "tete", bevel=0.25),
+        part("rounded_box", (0.21, 0.20, 0.08), (0, 0.05, 1.12), "Os", "machoire",
+             bottom=(0.78, 0.80), top=(1.0, 1.0), bevel=0.24),
+        # Sabre / fauchon rouillé à lame large
+        part("limb", (0.05, 0.15, 0.05), (0.27, 0.0, 0.55), "Cuir", "epee", rot=(90, 0, 0)),
+        part("rounded_box", (0.22, 0.05, 0.05), (0.27, 0.08, 0.55), "Rouille", "epee", bevel=0.2, smooth=False),
+        part("blade", (0.11, 0.76, 0.045), (0.27, 0.47, 0.55), "Rouille", "epee"),
     ]
     for k in range(3):
-        SK_PARTS.append(box((0.38 - 0.05 * k, 0.2, 0.05), (0, 0, 0.98 - 0.1 * k), "Os", "torse"))
+        SK_PARTS.append(part("limb", (0.39 - 0.04 * k, 0.22, 0.06), (0, 0.01, 0.98 - 0.095 * k), "Os", "torse",
+                             bend=(0.0, 0.06), power=0.82))
     for side, s in (("R", 1), ("L", -1)):
         SK_PARTS += [
-            box((0.08, 0.03, 0.08), (0.07 * s, 0.16, 1.28), "Noir", "tete"),
-            box((0.07, 0.07, 0.21), (0.27 * s, 0, 0.895), "Os", f"bras.{side}"),
-            box((0.07, 0.07, 0.20), (0.27 * s, 0, 0.69), "Os", f"avantbras.{side}"),
-            box((0.08, 0.08, 0.07), (0.27 * s, 0, 0.56), "Os", f"avantbras.{side}"),
-            box((0.08, 0.08, 0.24), (0.11 * s, 0, 0.38), "Os", f"cuisse.{side}"),
-            box((0.08, 0.08, 0.22), (0.11 * s, 0, 0.15), "Os", f"tibia.{side}"),
-            box((0.10, 0.16, 0.05), (0.11 * s, 0.03, 0.025), "Os", f"tibia.{side}"),
+            part("dome", (0.09, 0.04, 0.09), (0.075 * s, 0.16, 1.26), "Noir", "tete", rot=(-90, 0, 0)),
+            # Os des bras et jambes en sablier (épiphyses marquées aux articulations)
+            part("limb", (0.09, 0.09, 0.22), (0.27 * s, 0, 0.895), "Os", f"bras.{side}",
+                 top=(1.18, 1.18), mid=(0.68, 0.68), bottom=(1.12, 1.12)),
+            part("limb", (0.085, 0.085, 0.20), (0.27 * s, 0, 0.69), "Os", f"avantbras.{side}",
+                 top=(1.12, 1.12), mid=(0.68, 0.68), bottom=(1.10, 1.10)),
+            part("dome", (0.095, 0.10, 0.09), (0.27 * s, 0, 0.56), "Os", f"avantbras.{side}", rot=(180, 0, 0)),
+            part("limb", (0.10, 0.10, 0.24), (0.11 * s, 0, 0.38), "Os", f"cuisse.{side}",
+                 top=(1.18, 1.18), mid=(0.70, 0.70), bottom=(1.12, 1.12)),
+            part("limb", (0.095, 0.095, 0.22), (0.11 * s, 0, 0.15), "Os", f"tibia.{side}",
+                 top=(1.12, 1.12), mid=(0.68, 0.68), bottom=(1.10, 1.10)),
+            part("dome", (0.11, 0.18, 0.07), (0.11 * s, 0.04, 0.03), "Os", f"tibia.{side}"),
         ]
     skel.build_mesh(SK_PARTS)
 

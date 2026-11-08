@@ -48,6 +48,11 @@ var _dodge_velocity := Vector3.ZERO
 var _invulnerable := 0.0
 var _has_hit := false
 var _step_timer := 0.0
+var _dodge_hits: Array = []
+## Bottes de rafale (coffre de l'alcôve) : la roulade blesse et repousse.
+var dodge_strike := false
+## Tests automatiques uniquement : ne prend aucun dégât.
+var god_mode := false
 var _flash := 0.0
 var _flash_on := false
 var _mats: Array[ShaderMaterial] = []
@@ -100,6 +105,8 @@ func _physics_process(delta: float) -> void:
 			hv = _update_attack(delta, hv, input_dir)
 		State.DODGE:
 			hv = _dodge_velocity
+			if dodge_strike:
+				_dodge_strike_hits()
 			if state_time >= dodge_time:
 				collision_mask = MASK_NORMAL
 				hv *= 0.35
@@ -199,12 +206,13 @@ func _do_hit(a: Dictionary) -> void:
 	var hits := 0
 	var reach: float = a["range"]
 	var arc: float = a["arc"]
-	for node in get_tree().get_nodes_in_group("enemies"):
-		var e := node as Enemy
+	# monstres, boss, jarres et caisses : tout ce qui a take_hit() et un rayon
+	for node in get_tree().get_nodes_in_group("hittable"):
+		var e := node as Node3D
 		var to := e.global_position - global_position
 		to.y = 0.0
 		var dist := to.length()
-		if dist > reach + e.radius:
+		if dist > reach + float(e.get("radius")):
 			continue
 		if arc < 360.0 and dist > 0.3 and rad_to_deg(facing.angle_to(to)) > arc * 0.5:
 			continue
@@ -235,6 +243,7 @@ func _start_dodge(input_dir: Vector3) -> Vector3:
 	_dodge_velocity = dir * dodge_speed
 	_dodge_cd = dodge_time + dodge_cooldown
 	_invulnerable = maxf(_invulnerable, dodge_time + 0.05)
+	_dodge_hits.clear()
 	collision_mask = MASK_DODGE
 	_hide_trails()
 	Juice.burst(global_position + Vector3.UP * 0.1, [Color("d8d2c0"), Color("aaa290")], 5, 2.0, 0.08)
@@ -244,8 +253,45 @@ func _start_dodge(input_dir: Vector3) -> Vector3:
 	return _dodge_velocity
 
 
+## Bottes de rafale : chaque monstre touché pendant la roulade prend 1 et est repoussé.
+func _dodge_strike_hits() -> void:
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var e := node as Node3D
+		if _dodge_hits.has(e) or not e.has_method("take_hit"):
+			continue
+		var d := e.global_position - global_position
+		d.y = 0.0
+		if d.length() <= 0.9 + float(e.get("radius")):
+			_dodge_hits.append(e)
+			if e.take_hit(1, global_position, 7.0):
+				Juice.hitstop(0.03)
+				Sound.play("sword_hit", -4.0, 1.2)
+
+
+func heal(amount: int) -> void:
+	if state == State.DEAD:
+		return
+	hp = mini(hp + amount, max_hp)
+	health_changed.emit(hp, max_hp)
+
+
+## Retour au brasero après une chute : PV pleins, debout.
+func respawn(pos: Vector3) -> void:
+	global_position = pos
+	velocity = Vector3.ZERO
+	hp = max_hp
+	_invulnerable = 1.0
+	collision_mask = MASK_NORMAL
+	model.rotation = Vector3(0.0, _yaw(facing), 0.0)
+	model.visible = true
+	_hide_trails()
+	_set_state(State.MOVE)
+	_play("repos", true)
+	health_changed.emit(hp, max_hp)
+
+
 func take_damage(amount: int, from_pos: Vector3) -> void:
-	if state == State.DEAD or _invulnerable > 0.0:
+	if state == State.DEAD or _invulnerable > 0.0 or god_mode:
 		return
 	hp = maxi(hp - amount, 0)
 	health_changed.emit(hp, max_hp)
@@ -323,37 +369,48 @@ func _build_trails() -> void:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat.albedo_color = Color("e9fbff")
+	mat.vertex_color_use_as_albedo = true
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	mat.render_priority = 1
 	for a in ATTACKS:
 		var mi := MeshInstance3D.new()
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.visible = false
 		if a.get("spin", false):
-			mi.mesh = _make_arc(0.0, 359.0, 2.0, 0.35, 0.7, mat, false)
+			mi.mesh = _make_arc(0.0, 359.0, 2.0, 0.38, 0.7, mat, false)
 			add_child(mi)              # ne tourne pas avec le modèle
 		else:
-			mi.mesh = _make_arc(a["trail_from"], a["trail_to"], 1.55, 0.5, 0.9, mat, true)
+			mi.mesh = _make_arc(a["trail_from"], a["trail_to"], 1.55, 0.52, 0.9, mat, true)
 			model.add_child(mi)
 		_trails.append(mi)
 
 
-## Ruban en arc de cercle ; s'il est effilé, il est épais côté lame (fin de l'arc).
+## Ruban en arc de cercle à deux bandes (bord d'attaque blanc vif, sillage bleu glacier), sans contour noir.
 func _make_arc(from_deg: float, to_deg: float, r_out: float, width: float, height: float,
 		mat: Material, tapered: bool) -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var n := 16
 	var inner: Array[Vector3] = []
+	var mid: Array[Vector3] = []
 	var outer: Array[Vector3] = []
+	var col_edge := Color("ffffff")
+	var col_wake := Color("7ce8ff")
 	for i in n + 1:
 		var k := float(i) / n
 		var ang := deg_to_rad(lerpf(from_deg, to_deg, k))
-		var w := width * pow(k, 1.3) + 0.12 if tapered else width
+		var w := width * pow(k, 1.3) + 0.10 if tapered else width
 		var dir := Vector3(-sin(ang), 0.0, -cos(ang))
 		inner.append(dir * (r_out - w) + Vector3.UP * height)
+		mid.append(dir * (r_out - w * 0.42) + Vector3.UP * height)
 		outer.append(dir * r_out + Vector3.UP * height)
 	for i in n:
-		for v in [inner[i], outer[i], outer[i + 1], inner[i], outer[i + 1], inner[i + 1]]:
+		st.set_color(col_wake)
+		for v in [inner[i], mid[i], mid[i + 1], inner[i], mid[i + 1], inner[i + 1]]:
+			st.add_vertex(v)
+		st.set_color(col_edge)
+		for v in [mid[i], outer[i], outer[i + 1], mid[i], outer[i + 1], mid[i + 1]]:
 			st.add_vertex(v)
 	st.set_material(mat)
 	return st.commit()

@@ -42,6 +42,12 @@ func shake(pixels: float) -> void:
 	_shake = maxf(_shake, pixels)
 
 
+## Recadre immédiatement sur la cible (téléportation, retour au brasero).
+func snap() -> void:
+	if is_instance_valid(_target):
+		_follow = _target.global_position
+
+
 func _process(delta: float) -> void:
 	var vp_height := float(get_viewport().size.y)
 	size = vp_height / pixels_per_meter
@@ -67,6 +73,7 @@ func _process(delta: float) -> void:
 func _add_outline() -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = OUTLINE_SHADER
+	mat.render_priority = -10
 	var quad := QuadMesh.new()
 	quad.size = Vector2(2.0, 2.0)
 	quad.material = mat

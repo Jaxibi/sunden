@@ -13,6 +13,9 @@ static func spawn(parent: Node, pos: Vector3, colors: Array, count := 8, speed :
 	for i in count:
 		var mat := StandardMaterial3D.new()
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		mat.render_priority = 2
 		mat.albedo_color = colors.pick_random()
 		var mesh := BoxMesh.new()
 		var s := size * randf_range(0.7, 1.3)

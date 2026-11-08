@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/pixel_camera.gd" id="2_cam"]
-[ext_resource type="PackedScene" path="res://scenes/level.tscn" id="3_level"]
+[ext_resource type="PackedScene" path="res://scenes/level1.tscn" id="3_level"]
 [ext_resource type="PackedScene" path="res://scenes/hero.tscn" id="4_hero"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="5_hud"]
 

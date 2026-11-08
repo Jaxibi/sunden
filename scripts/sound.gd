@@ -24,6 +24,14 @@ const TUNING := {
 	"slime_windup": {"volume": -3.0},
 	"skeleton_windup": {"volume": -3.0},
 	"skeleton_spawn": {"volume": -4.0},
+	"spike_trap": {"polyphony": 2},
+	"gate_move": {"pitch": 1.03, "polyphony": 2},
+	"brazier_light": {"pitch": 1.0, "polyphony": 1},
+	"chest_open": {"pitch": 1.0, "polyphony": 1},
+	"victory": {"pitch": 1.0, "polyphony": 1},
+	"boss_roar": {"pitch": 1.03, "polyphony": 1},
+	"boss_slam": {"pitch": 1.04, "polyphony": 2},
+	"heart_pickup": {"pitch": 1.04},
 }
 const DEFAULT_PITCH := 1.06
 const DEFAULT_POLYPHONY := 4
@@ -39,8 +47,6 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_music = _loop_player("Music")
 	_ambience = _loop_player("Ambience")
-
-
 	# fermeture : on coupe le son et on laisse au serveur audio le temps de libérer les flux
 	get_tree().set_auto_accept_quit(false)
 
@@ -63,7 +69,8 @@ func quit_cleanly() -> void:
 
 
 # --------------------------------------------------------------------------- effets
-func play(sound_name: String, volume_db := 0.0) -> void:
+## `pitch` < 1 rend le son plus grave (le Roi Gluant réutilise les sons du slime).
+func play(sound_name: String, volume_db := 0.0, pitch := 1.0) -> void:
 	if _quitting:
 		return
 	var p := _player(sound_name)
@@ -71,6 +78,7 @@ func play(sound_name: String, volume_db := 0.0) -> void:
 		return
 	var tuning: Dictionary = TUNING.get(sound_name, {})
 	p.volume_db = float(tuning.get("volume", 0.0)) + volume_db
+	p.pitch_scale = pitch
 	p.play()
 
 
