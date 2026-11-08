@@ -5,7 +5,14 @@ extends Node
 ##   --screenshot=chemin.png   visite du niveau en captures (chemin_1.png, chemin_2.png...) puis quitte
 ##   --selftest                parcours automatique (objets, 1re salle, boss) avec bilan, puis quitte
 
-const NATIVE := Vector2i(320, 180)
+## Zoom : la densité (pixels par mètre) ne change jamais ; zoomer change le facteur d'agrandissement
+## entier, donc la taille de l'image native et la portion du monde visible.
+## Hauteur native entre 180 (le plus proche) et 360 (le plus éloigné) ; la largeur suit l'écran.
+## Exemple en 5120x1440 (32:9) : x8 = 640x180, x6 = 854x240 (par défaut), x4 = 1280x360.
+const NEAREST_NATIVE_H := 180
+const FARTHEST_NATIVE_H := 360
+const DEFAULT_NATIVE_H := 240.0
+const MAX_ASPECT := 4.0                # au-delà de 4:1, bandes noires sur les côtés
 const MARGIN := 1                      # pixels en plus autour de l'image pour le décalage sous-pixel
 const RESPAWN_DELAY := 3.0
 
@@ -18,6 +25,9 @@ const RESPAWN_DELAY := 3.0
 @onready var hud: Hud = $HUD
 
 var pixel_scale := 4
+var native := Vector2i(320, 180)
+## Hauteur native souhaitée (garde le même zoom quand la fenêtre change de taille).
+var zoom_height := DEFAULT_NATIVE_H
 var checkpoint := Vector3.ZERO
 
 var _base_pos := Vector2.ZERO
@@ -39,6 +49,7 @@ func _ready() -> void:
 	camera.snap()
 
 	hero.health_changed.connect(hud.set_health)
+	hero.armor_changed.connect(func(set_name: String): hud.announce(set_name, 1.4))
 	hero.died.connect(_on_hero_died)
 	hud.set_health(hero.hp, hero.max_hp)
 	level.zone_changed.connect(func(zone): hud.set_zone(String(zone["name"])))
@@ -52,6 +63,10 @@ func _ready() -> void:
 	Sound.play_ambience("forest_ambience")
 
 	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--zoom-height="):          # tests : hauteur native voulue (180 à 360)
+			zoom_height = float(arg.get_slice("=", 1))
+			_layout()
+	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot="):
 			_shot_path = arg.get_slice("=", 1)
 			_run_tour()
@@ -61,21 +76,64 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	display.position = _base_pos + camera.subpixel * pixel_scale
+	if Input.is_action_just_pressed("toggle_fullscreen"):
+		_toggle_fullscreen()
+	if Input.is_action_just_pressed("equip_cycle"):
+		hero.cycle_armor_set()
+	elif Input.is_action_just_pressed("equip_1"):
+		hero.set_armor_set(Hero.ArmorSet.TISSU)
+	elif Input.is_action_just_pressed("equip_2"):
+		hero.set_armor_set(Hero.ArmorSet.CUIR)
+	elif Input.is_action_just_pressed("equip_3"):
+		hero.set_armor_set(Hero.ArmorSet.PLATES)
 	if hero.state == Hero.State.DEAD:
 		_respawn_in -= delta
 		if _respawn_in <= 0.0 or (_respawn_in < RESPAWN_DELAY - 0.8 and Input.is_action_just_pressed("restart")):
 			_respawn()
 
 
-## Facteur d'agrandissement entier le plus grand qui tient dans la fenêtre.
+func _unhandled_input(event: InputEvent) -> void:
+	# la molette envoie appui et relâchement dans la même image : on lit l'événement lui-même
+	if event.is_action_pressed("zoom_out"):
+		_zoom(1)
+	elif event.is_action_pressed("zoom_in"):
+		_zoom(-1)
+
+
+## Facteurs d'agrandissement entiers possibles pour cette fenêtre, du plus proche au plus éloigné.
+func _zoom_scales() -> Vector2i:
+	var h := float(get_tree().root.size.y)
+	return Vector2i(maxi(1, int(h / NEAREST_NATIVE_H)), maxi(1, int(ceil(h / FARTHEST_NATIVE_H))))
+
+
+## `step` > 0 : dézoomer (facteur plus petit, plus de monde visible).
+func _zoom(step: int) -> void:
+	var r := _zoom_scales()
+	var s := clampi(pixel_scale - step, r.y, r.x)
+	if s == pixel_scale:
+		return
+	zoom_height = float(get_tree().root.size.y) / s
+	_layout()
+
+
+## Facteur entier tiré du zoom choisi, puis image native qui remplit toute la fenêtre.
 func _layout() -> void:
 	var win := Vector2(get_tree().root.size)
-	pixel_scale = maxi(1, int(minf(win.x / NATIVE.x, win.y / NATIVE.y)))
+	var r := _zoom_scales()
+	pixel_scale = clampi(roundi(win.y / zoom_height), r.y, r.x)
+	var nh := int(ceil(win.y / pixel_scale))
+	native = Vector2i(mini(int(ceil(win.x / pixel_scale)), int(nh * MAX_ASPECT)), nh)
 	display.stretch_shrink = pixel_scale
-	display.size = Vector2(NATIVE + Vector2i(MARGIN, MARGIN) * 2) * pixel_scale
-	var origin := ((win - Vector2(NATIVE) * pixel_scale) * 0.5).floor()
+	display.size = Vector2(native + Vector2i(MARGIN, MARGIN) * 2) * pixel_scale
+	var origin := ((win - Vector2(native) * pixel_scale) * 0.5).floor()
 	_base_pos = origin - Vector2(MARGIN, MARGIN) * pixel_scale
-	hud.set_pixel_scale(pixel_scale, origin)
+	hud.set_layout(pixel_scale, origin, native)
+
+
+func _toggle_fullscreen() -> void:
+	var fs := DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN,
+		DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if fs else DisplayServer.WINDOW_MODE_FULLSCREEN)
 
 
 # --------------------------------------------------------------------------- déroulement
@@ -160,6 +218,9 @@ func _setup_input() -> void:
 		"move_left": [KEY_A, KEY_LEFT], "move_right": [KEY_D, KEY_RIGHT],
 		"move_up": [KEY_W, KEY_UP], "move_down": [KEY_S, KEY_DOWN],
 		"attack": [KEY_J], "dodge": [KEY_SPACE, KEY_K], "restart": [KEY_R],
+		"equip_cycle": [KEY_TAB], "equip_1": [KEY_1], "equip_2": [KEY_2], "equip_3": [KEY_3],
+		"toggle_fullscreen": [KEY_F11],
+		"zoom_in": [KEY_EQUAL, KEY_KP_ADD], "zoom_out": [KEY_MINUS, KEY_KP_SUBTRACT],
 	}
 	for action in keys:
 		if InputMap.has_action(action):
@@ -169,6 +230,14 @@ func _setup_input() -> void:
 			var ev := InputEventKey.new()
 			ev.physical_keycode = k
 			InputMap.action_add_event(action, ev)
+	for wheel in [[MOUSE_BUTTON_WHEEL_UP, "zoom_in"], [MOUSE_BUTTON_WHEEL_DOWN, "zoom_out"]]:
+		var ev := InputEventMouseButton.new()
+		ev.button_index = wheel[0]
+		InputMap.action_add_event(wheel[1], ev)
+	var alt_enter := InputEventKey.new()               # Alt+Entrée : plein écran, comme F11
+	alt_enter.physical_keycode = KEY_ENTER
+	alt_enter.alt_pressed = true
+	InputMap.action_add_event("toggle_fullscreen", alt_enter)
 	_add_axis("move_left", JOY_AXIS_LEFT_X, -1.0)
 	_add_axis("move_right", JOY_AXIS_LEFT_X, 1.0)
 	_add_axis("move_up", JOY_AXIS_LEFT_Y, -1.0)

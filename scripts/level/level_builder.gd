@@ -130,6 +130,18 @@ func cell(x: int, z: int) -> String:
 	return String(rows[z])[x]
 
 
+## Rendu au-delà de la carte (écrans larges) : on prolonge le bord, forêt ou roche.
+## Pas de collision ici : ces cases sont hors d'atteinte.
+const BORDER := 26                     # assez pour le zoom le plus éloigné en 32:9 (~44 m de large)
+
+
+func _render_cell(x: int, z: int) -> String:
+	if x >= 0 and x < width and z >= 0 and z < height:
+		return cell(x, z)
+	var edge := cell(clampi(x, 0, width - 1), clampi(z, 0, height - 1))
+	return "#" if edge == "#" else "T"
+
+
 func cell_center(x: int, z: int) -> Vector3:
 	return Vector3(x + 0.5, 0.0, z + 0.5)
 
@@ -172,7 +184,7 @@ func prop(template: String) -> Node3D:
 
 # --------------------------------------------------------------------------- sols
 func _ground_kind(x: int, z: int, depth := 0) -> String:
-	var c := cell(x, z)
+	var c := _render_cell(x, z)
 	if c == "." or c == "T":
 		return "herbe"
 	if c == ",":
@@ -189,9 +201,9 @@ func _ground_kind(x: int, z: int, depth := 0) -> String:
 
 func _build_ground() -> void:
 	var tools := {}
-	for z in height:
-		for x in width:
-			var c := cell(x, z)
+	for z in range(-BORDER, height + BORDER):
+		for x in range(-BORDER, width + BORDER):
+			var c := _render_cell(x, z)
 			if c == "#" or c == " ":
 				continue
 			var kind := _ground_kind(x, z)
@@ -220,25 +232,25 @@ func _build_ground() -> void:
 
 # --------------------------------------------------------------------------- murs
 func _wall_height(x: int, z: int) -> float:
-	if cell(x, z) != "#":
+	if _render_cell(x, z) != "#":
 		return 0.0
 	# mur court s'il se trouve devant un sol (entre ce sol et la caméra, qui regarde vers -X -Z)
 	for d in [Vector2i(-1, 0), Vector2i(0, -1), Vector2i(-1, -1)]:
 		if _is_open(cell(x + d.x, z + d.y)):
 			return 0.5
-	var base := 1.15 if _zone_music(x, z) == "forest" else 1.9
+	var base := 1.15 if _zone_music(clampi(x, 0, width - 1), clampi(z, 0, height - 1)) == "forest" else 1.9
 	return base + float(_hash(x, z) % 4) * 0.08
 
 
 func _build_walls() -> void:
 	var tools := {}
-	for z in height:
-		for x in width:
-			if cell(x, z) != "#":
+	for z in range(-BORDER, height + BORDER):
+		for x in range(-BORDER, width + BORDER):
+			if _render_cell(x, z) != "#":
 				continue
 			var h := _wall_height(x, z)
 			var hs := _hash(x, z)
-			var forest := _zone_music(x, z) == "forest"
+			var forest := _zone_music(clampi(x, 0, width - 1), clampi(z, 0, height - 1)) == "forest"
 			var top := "mousse" if hs % 9 == 0 else ("ruine" if forest else "sommet")
 			var side := "ruine" if forest else ("mur1" if hs % 2 else "mur2")
 			_quad(_tool(tools, top), Vector3(x, h, z), Vector3(x + 1, h, z), Vector3(x + 1, h, z + 1),
@@ -319,12 +331,13 @@ func _commit_mesh(mesh_name: String, tools: Dictionary, shadows: bool) -> void:
 func _build_vegetation() -> void:
 	var trees := {"P_Arbre": [], "P_Arbre2": []}
 	var tufts: Array = []
-	for z in height:
-		for x in width:
-			var c := cell(x, z)
+	for z in range(-BORDER, height + BORDER):
+		for x in range(-BORDER, width + BORDER):
+			var c := _render_cell(x, z)
 			if c == "T":
+				# lisière pleine près des chemins, forêt un peu plus clairsemée au loin
 				var dist := _distance_to_open(x, z, 3)
-				if dist > 3 or (dist == 3 and _hash(x, z) % 5 < 2):
+				if dist > 3 and _hash(x, z) % 7 == 0:
 					continue
 				var t := Transform3D(Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3.ONE * _rng.randf_range(0.85, 1.3)),
 					cell_center(x, z) + Vector3(_rng.randf_range(-0.2, 0.2), 0, _rng.randf_range(-0.2, 0.2)))

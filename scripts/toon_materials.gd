@@ -57,18 +57,19 @@ static func _convert(src: Material, node_name := "") -> Material:
 		toon.set_shader_parameter("spec_threshold", 0.86)
 		toon.set_shader_parameter("rim_strength", 0.22)
 		toon.set_shader_parameter("rim_threshold", 0.72)
-	elif mat_name == "Acier" or mat_name == "Or":
+	elif mat_name in ["Acier", "AcierSombre", "Or"]:
+		toon.set_shader_parameter("outline_mask", 0.5)
 		toon.set_shader_parameter("spec_strength", 0.50)
 		toon.set_shader_parameter("spec_threshold", 0.76)
 		toon.set_shader_parameter("rim_strength", 0.22)
 		toon.set_shader_parameter("rim_threshold", 0.70)
-	elif mat_name in ["Peau", "Cheveux", "Tunique", "Cape", "Pantalon", "Os"]:
+	elif mat_name in ["Peau", "Cheveux", "Tunique", "TissuClair", "Cape", "CapeVerte", "Pantalon", "Os"]:
 		# Silhouette externe nette sans plis noirs internes sur le visage, les os et les étoffes
 		toon.set_shader_parameter("outline_mask", 0.5)
 		toon.set_shader_parameter("rim_strength", 0.15)
 		toon.set_shader_parameter("rim_threshold", 0.72)
-	elif mat_name == "Cuir" or mat_name == "Rouille":
+	elif mat_name in ["Cuir", "CuirClair", "BoisSombre", "Rouille"]:
 		toon.set_shader_parameter("outline_mask", 0.5)
-		toon.set_shader_parameter("spec_strength", 0.20)
+		toon.set_shader_parameter("spec_strength", 0.22)
 		toon.set_shader_parameter("spec_threshold", 0.78)
 	return toon

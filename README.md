@@ -16,6 +16,14 @@ D:\dev\Godot_v4.7.2-stable_win64\Godot_v4.7.2-stable_win64.exe --path E:\dev\sun
 | Attaquer (combo ×3) | J / clic gauche | X |
 | Esquiver  | Espace / K / clic droit | A |
 | Réapparaître au brasero (après une chute) | R | Start |
+| Plein écran / fenêtre | F11 ou Alt+Entrée | |
+| Zoomer / dézoomer | Molette, + / − | |
+
+Le jeu démarre en plein écran. L'image est rendue en basse résolution puis agrandie d'un facteur
+entier ; la densité (≈ 29 pixels par mètre) ne change jamais. Le zoom change le facteur, donc la part
+du monde visible : hauteur native de 180 (le plus proche) à 360 pixels (le plus éloigné), 240 au
+démarrage. La largeur suit le format de l'écran. En 5120×1440 (32:9) : ×8 = 640×180, ×6 = 854×240,
+×4 = 1280×360, toujours sans bandes noires.
 
 ## Niveau 1 : « La Crypte Gluante »
 

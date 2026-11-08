@@ -57,6 +57,7 @@ class Rig:
         self.rest = {pb.name: pb.bone.matrix_local.to_quaternion() for pb in self.pb}
         self._last = {}
         self.body = None
+        self.bodies = []
 
     # ------------------------------------------------------------------ maillage
     @staticmethod
@@ -234,10 +235,11 @@ class Rig:
         faces = list({f for v in verts for f in v.link_faces})
         return verts, faces
 
-    def build_mesh(self, parts):
+    def build_mesh(self, parts, mesh_name=None):
         """parts : dicts {shape, size, center, mat, bone | weights(co)->{os: poids}, rot?, ...}"""
-        me = bpy.data.meshes.new(self.arm.name + "_Mesh")
-        body = bpy.data.objects.new(self.arm.name + "_Mesh", me)
+        mname = mesh_name or (self.arm.name + "_Mesh")
+        me = bpy.data.meshes.new(mname)
+        body = bpy.data.objects.new(mname, me)
         bpy.context.scene.collection.objects.link(body)
         mat_index = {}
         for p in parts:
@@ -265,6 +267,7 @@ class Rig:
         body.parent = self.arm
         body.modifiers.new("Armature", "ARMATURE").object = self.arm
         self.body = body
+        self.bodies.append(body)
         return body
 
     # ------------------------------------------------------------------ poses

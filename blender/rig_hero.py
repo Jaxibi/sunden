@@ -1,12 +1,16 @@
-r"""Héros animé : squelette, maillage rigide (chaque pièce suit un seul os) et animations.
+r"""Héros animé : squelette, 3 ensembles d'équipement (Tissu, Cuir, Plates) et animations.
 
 Usage (depuis E:\dev\sunden) :
     D:\dev\Blender\blender.exe -b blender/exemple_hackslash.blend --python blender/rig_hero.py
 
 Produit :
-    blender/heros_anime.blend        le héros riggé et ses actions, modifiable dans Blender
-    renders/heros_animations.png     planche de contrôle (une ligne par animation, 15 i/s)
-    assets/models/hero.glb           export pour Godot (Skeleton3D + AnimationPlayer)
+    blender/heros_anime.blend        le héros riggé, ses 3 tenues et ses actions
+    renders/heros_equipements.png    planche comparative des 3 ensembles (Tissu, Cuir, Plates)
+    renders/heros_animations.png     planche de contrôle complète des animations
+    assets/models/hero.glb           export pour Godot (Skeleton3D + Equip_Tissu/Cuir/Plates + AnimationPlayer)
+    assets/models/hero_tissu.glb     export individuel tenue Tissu
+    assets/models/hero_cuir.glb      export individuel tenue Cuir
+    assets/models/hero_plates.glb    export individuel tenue Plates
 
 Conventions des poses : voir rig_utils.py. Pour ce personnage :
     X+ : jambe / bras vers l'avant, mais buste vers l'arrière (X- = se pencher en avant)
@@ -28,8 +32,31 @@ ROOT = os.path.dirname(HERE)
 OUT_BLEND = os.path.join(HERE, "heros_anime.blend")
 OUT_GLB = os.path.join(ROOT, "assets", "models", "hero.glb")
 OUT_SHEET = os.path.join(ROOT, "renders", "heros_animations.png")
+OUT_EQUIP_SHEET = os.path.join(ROOT, "renders", "heros_equipements.png")
 
 rig_utils.clean_scene()
+
+
+def ensure_mat(name, hex_color):
+    if name in bpy.data.materials:
+        return bpy.data.materials[name]
+    h = hex_color.lstrip("#")
+    c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    lin = tuple(x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c)
+    m = bpy.data.materials["Tunique"].copy()
+    m.name = name
+    m.diffuse_color = lin + (1.0,)
+    for n in m.node_tree.nodes:
+        if n.type == "VECT_MATH":
+            n.inputs[1].default_value = lin
+    return m
+
+
+# Nuances complémentaires pour bien différencier les 3 ensembles d'équipement
+ensure_mat("TissuClair", "#dfd9ec")
+ensure_mat("CuirClair", "#b88248")
+ensure_mat("CapeVerte", "#52994e")
+ensure_mat("AcierSombre", "#8693a6")
 
 # --------------------------------------------------------------------------- squelette
 BONES = [
@@ -50,81 +77,216 @@ BONES.append(("epee", (0.31, 0, 0.53), (0.31, 0.35, 0.53), "avantbras.R"))
 rig = rig_utils.Rig("Heros", BONES)
 
 
-# --------------------------------------------------------------------------- maillage (volumes sculptés)
+# --------------------------------------------------------------------------- 3 ensembles d'équipement
 def part(shape, size, center, mat, bone, **kw):
     return {"shape": shape, "size": size, "center": center, "mat": mat, "bone": bone, **kw}
 
 
-PARTS = [
-    # Hanches : basque de tunique évasée + ceinture cintrée + boucle dorée
-    part("rounded_box", (0.44, 0.32, 0.19), (0, 0, 0.50), "Tunique", "hanches",
-         top=(0.82, 0.82), bottom=(1.12, 1.08), bevel=0.22, power=0.82),
-    part("limb", (0.42, 0.31, 0.09), (0, 0, 0.57), "Cuir", "hanches", power=0.82),
-    part("dome", (0.12, 0.07, 0.11), (0, 0.16, 0.57), "Or", "hanches", rot=(-90, 0, 0)),
+def base_head(hair_band_mat=None):
+    """Tête sculptée et chevelure en mèches (commune aux tenues Tissu et Cuir)."""
+    pts = [
+        part("limb", (0.16, 0.16, 0.10), (0, 0, 1.05), "Peau", "tete"),
+        part("rounded_box", (0.33, 0.32, 0.33), (0, 0.02, 1.21), "Peau", "tete",
+             bottom=(0.78, 0.82), mid=(1.0, 1.0), top=(0.92, 0.94), bevel=0.30, power=0.88),
+        part("dome", (0.38, 0.37, 0.21), (0, -0.01, 1.33), "Cheveux", "tete", flare=1.04),
+        part("limb", (0.17, 0.24, 0.11), (0.05, 0.12, 1.34), "Cheveux", "tete",
+             rot=(25, 15, -22), bottom=(0.45, 0.45), top=(1.0, 1.0)),
+        part("dome", (0.36, 0.22, 0.28), (0, -0.11, 1.24), "Cheveux", "tete", rot=(-55, 0, 0)),
+        part("limb", (0.24, 0.14, 0.18), (0, -0.16, 1.14), "Cheveux", "tete",
+             rot=(-35, 0, 0), bottom=(0.4, 0.4), top=(1.0, 1.0)),
+    ]
+    if hair_band_mat:
+        pts.append(part("limb", (0.355, 0.345, 0.055), (0, 0.01, 1.29), hair_band_mat, "tete", power=0.85))
+    for s in (1, -1):
+        pts += [
+            part("dome", (0.06, 0.08, 0.10), (0.165 * s, 0.0, 1.20), "Peau", "tete", rot=(0, 80 * s, 0)),
+            part("limb", (0.09, 0.14, 0.22), (0.16 * s, 0.04, 1.24), "Cheveux", "tete",
+                 rot=(12, -10 * s, 0), bottom=(0.45, 0.5), top=(1.0, 1.0)),
+            part("rounded_box", (0.055, 0.03, 0.075), (0.075 * s, 0.168, 1.20), "Noir", "tete", bevel=0.25),
+        ]
+    return pts
 
-    # Torse en V athlétique + baudrier en cuir + foulard rouge autour du cou
-    part("rounded_box", (0.45, 0.31, 0.42), (0, 0, 0.80), "Tunique", "torse",
-         bottom=(0.78, 0.80), mid=(0.96, 0.96), top=(1.08, 1.04), bevel=0.26, power=0.84),
-    part("limb", (0.46, 0.32, 0.07), (0, 0.01, 0.81), "Cuir", "torse", rot=(0, 28, 0)),
-    part("limb", (0.37, 0.34, 0.12), (0, -0.01, 1.01), "Cape", "torse",
-         bottom=(1.06, 1.06), top=(0.86, 0.88)),
 
-    # Tête : cou, visage ovale sculpté, chevelure volumineuse en mèches
-    part("limb", (0.16, 0.16, 0.10), (0, 0, 1.05), "Peau", "tete"),
-    part("rounded_box", (0.33, 0.32, 0.33), (0, 0.02, 1.21), "Peau", "tete",
-         bottom=(0.78, 0.82), mid=(1.0, 1.0), top=(0.92, 0.94), bevel=0.30, power=0.88),
-    part("dome", (0.38, 0.37, 0.22), (0, -0.01, 1.33), "Cheveux", "tete", flare=1.04),
-    part("limb", (0.17, 0.24, 0.11), (0.05, 0.12, 1.34), "Cheveux", "tete",
-         rot=(25, 15, -22), bottom=(0.45, 0.45), top=(1.0, 1.0)),
-    part("dome", (0.36, 0.22, 0.28), (0, -0.11, 1.24), "Cheveux", "tete", rot=(-55, 0, 0)),
-    part("limb", (0.24, 0.14, 0.18), (0, -0.16, 1.14), "Cheveux", "tete",
-         rot=(-35, 0, 0), bottom=(0.4, 0.4), top=(1.0, 1.0)),
-
-    # Cape trapézoïdale plissée
-    part("cape", (0.50, 0.10, 0.66), (0, -0.20, 0.70), "Cape", "cape", rot=(8, 0, 0)),
-
-    # Épée : pommeau rond, fusée en cuir, garde profilée, lame large en losange à pointe
-    part("dome", (0.09, 0.09, 0.09), (0.31, -0.09, 0.53), "Or", "epee", rot=(-90, 0, 0)),
-    part("limb", (0.06, 0.18, 0.06), (0.31, 0.01, 0.53), "Cuir", "epee", rot=(90, 0, 0)),
-    part("rounded_box", (0.34, 0.07, 0.07), (0.31, 0.11, 0.53), "Or", "epee",
-         bottom=(0.75, 0.75), top=(1.05, 1.05), bevel=0.22, smooth=False),
-    part("blade", (0.14, 0.96, 0.055), (0.31, 0.61, 0.53), "Acier", "epee"),
-
-    # Bouclier en écu incurvé + bordure et blason dorés
-    part("shield", (0.08, 0.44, 0.52), (-0.40, 0.04, 0.65), "Tunique", "avantbras.L"),
-    part("rounded_box", (0.09, 0.39, 0.07), (-0.40, 0.04, 0.89), "Or", "avantbras.L", bevel=0.2, smooth=False),
-    part("dome", (0.07, 0.15, 0.18), (-0.44, 0.04, 0.67), "Or", "avantbras.L", rot=(0, -90, 0)),
+# 1) ENSEMBLE TISSU : Robe de Mage-Lame, diadème d'or, pèlerine souple, manches bouffantes, targe runique
+PARTS_TISSU = base_head(hair_band_mat="Or") + [
+    # Diadème frontal à joyau + col-capuchon drapé
+    part("dome", (0.08, 0.05, 0.09), (0, 0.175, 1.30), "Cape", "tete", rot=(-90, 0, 0)),
+    part("limb", (0.40, 0.36, 0.14), (0, -0.02, 1.00), "Cape", "torse",
+         bottom=(1.12, 1.10), top=(0.86, 0.88)),
+    # Tunique drapée en tissu + étole runique claire et or sur le devant + ceinture dorée nouée
+    part("rounded_box", (0.43, 0.29, 0.42), (0, 0, 0.80), "Tunique", "torse",
+         bottom=(0.76, 0.78), mid=(0.94, 0.94), top=(1.04, 1.02), bevel=0.28, power=0.86),
+    part("rounded_box", (0.16, 0.31, 0.40), (0, 0.01, 0.80), "TissuClair", "torse", bevel=0.20),
+    part("limb", (0.41, 0.31, 0.10), (0, 0, 0.57), "Or", "hanches", power=0.84),
+    # Longue basque de robe évasée + pan d'étole frontal jusqu'aux genoux
+    part("rounded_box", (0.47, 0.35, 0.28), (0, 0, 0.45), "Tunique", "hanches",
+         top=(0.78, 0.78), bottom=(1.18, 1.14), bevel=0.22, power=0.84),
+    part("rounded_box", (0.15, 0.37, 0.30), (0, 0.01, 0.44), "TissuClair", "hanches",
+         top=(0.85, 0.85), bottom=(1.08, 1.02), bevel=0.18),
+    # Longue cape mystique bicolore
+    part("cape", (0.48, 0.10, 0.70), (0, -0.19, 0.68), "Cape", "cape", rot=(8, 0, 0)),
+    # Lame fine runique + garde en croissant doré
+    part("dome", (0.08, 0.08, 0.08), (0.31, -0.08, 0.53), "Or", "epee", rot=(-90, 0, 0)),
+    part("limb", (0.055, 0.18, 0.055), (0.31, 0.01, 0.53), "TissuClair", "epee", rot=(90, 0, 0)),
+    part("limb", (0.28, 0.08, 0.06), (0.31, 0.11, 0.53), "Or", "epee", bend=(0.0, 0.06)),
+    part("blade", (0.10, 0.98, 0.045), (0.31, 0.62, 0.53), "Acier", "epee"),
+    # Petite Targe mystique ronde et dorée
+    part("dome", (0.09, 0.36, 0.36), (-0.39, 0.04, 0.66), "TissuClair", "avantbras.L", rot=(0, -90, 0)),
+    part("limb", (0.06, 0.38, 0.38), (-0.38, 0.04, 0.66), "Or", "avantbras.L", rot=(0, 90, 0)),
+    part("dome", (0.07, 0.14, 0.14), (-0.42, 0.04, 0.66), "Cape", "avantbras.L", rot=(0, -90, 0)),
 ]
 for side, s in (("R", 1), ("L", -1)):
-    PARTS += [
-        # Épaulettes bombées avec liseré doré
-        part("dome", (0.24, 0.34, 0.18), (0.29 * s, 0, 0.99), "Acier", "torse",
-             rot=(0, 22 * s, 0), flare=1.08),
-        part("limb", (0.25, 0.35, 0.05), (0.30 * s, 0, 0.93), "Or", "torse",
-             rot=(0, 22 * s, 0)),
-        # Oreilles, mèches latérales et yeux
-        part("dome", (0.06, 0.08, 0.10), (0.165 * s, 0.0, 1.20), "Peau", "tete", rot=(0, 80 * s, 0)),
-        part("limb", (0.09, 0.14, 0.22), (0.16 * s, 0.04, 1.24), "Cheveux", "tete",
-             rot=(12, -10 * s, 0), bottom=(0.45, 0.5), top=(1.0, 1.0)),
-        part("rounded_box", (0.055, 0.03, 0.075), (0.075 * s, 0.168, 1.20), "Noir", "tete", bevel=0.25),
-        # Bras fuselés, brassards de cuir et poings ronds
-        part("limb", (0.15, 0.15, 0.25), (0.31 * s, 0, 0.86), "Tunique", f"bras.{side}",
+    PARTS_TISSU += [
+        # Épaules souples en pèlerine d'étoffe (sans plaques de métal)
+        part("dome", (0.21, 0.29, 0.14), (0.26 * s, 0, 0.97), "Cape", "torse",
+             rot=(0, 28 * s, 0), flare=1.05),
+        # Manches bouffantes en tissu resserrées par un bracelet d'or
+        part("limb", (0.16, 0.16, 0.25), (0.31 * s, 0, 0.86), "Tunique", f"bras.{side}",
+             top=(0.95, 0.95), mid=(1.15, 1.15), bottom=(0.90, 0.90)),
+        part("limb", (0.16, 0.16, 0.17), (0.31 * s, 0, 0.66), "Tunique", f"avantbras.{side}",
+             top=(1.12, 1.12), mid=(1.18, 1.18), bottom=(0.75, 0.75)),
+        part("limb", (0.13, 0.13, 0.05), (0.31 * s, 0, 0.58), "Or", f"avantbras.{side}"),
+        part("dome", (0.12, 0.13, 0.12), (0.31 * s, 0.01, 0.53), "Peau", f"avantbras.{side}", rot=(180, 0, 0)),
+        # Jambes de robe et chaussons souples en étoffe
+        part("limb", (0.16, 0.16, 0.24), (0.12 * s, 0, 0.38), "Tunique", f"cuisse.{side}",
+             top=(1.10, 1.10), bottom=(0.92, 0.92)),
+        part("limb", (0.13, 0.13, 0.18), (0.12 * s, 0, 0.19), "TissuClair", f"tibia.{side}",
+             top=(1.0, 1.0), bottom=(0.85, 0.85)),
+        part("dome", (0.15, 0.24, 0.10), (0.12 * s, 0.04, 0.05), "Pantalon", f"tibia.{side}", flare=1.02),
+    ]
+
+
+# 2) ENSEMBLE CUIR : Brigandine de Rôdeur, épaulière asymétrique cloutée, cape courte verte, rondache
+PARTS_CUIR = base_head(hair_band_mat="CuirClair") + [
+    # Cache-cou de rôdeur + pourpoint de cuir fauve moulé + plastron et baudriers croisés à boucle d'or
+    part("limb", (0.36, 0.33, 0.12), (0, -0.01, 1.01), "CapeVerte", "torse",
+         bottom=(1.04, 1.04), top=(0.88, 0.88)),
+    part("rounded_box", (0.45, 0.31, 0.42), (0, 0, 0.80), "CuirClair", "torse",
+         bottom=(0.78, 0.80), mid=(0.96, 0.96), top=(1.06, 1.04), bevel=0.25, power=0.84),
+    part("rounded_box", (0.38, 0.32, 0.22), (0, 0.01, 0.86), "Cuir", "torse",
+         bottom=(0.85, 0.90), top=(1.04, 1.02), bevel=0.22),
+    part("limb", (0.47, 0.33, 0.06), (0, 0.01, 0.80), "BoisSombre", "torse", rot=(0, 30, 0)),
+    part("limb", (0.47, 0.33, 0.06), (0, 0.01, 0.80), "BoisSombre", "torse", rot=(0, -30, 0)),
+    part("dome", (0.09, 0.06, 0.09), (0, 0.165, 0.81), "Or", "torse", rot=(-90, 0, 0)),
+    # Ceinture utilitaire à sacoches latérales + basque de cuir clouté
+    part("rounded_box", (0.43, 0.31, 0.17), (0, 0, 0.51), "CuirClair", "hanches",
+         top=(0.84, 0.84), bottom=(1.08, 1.05), bevel=0.20, power=0.82),
+    part("limb", (0.43, 0.32, 0.09), (0, 0, 0.57), "BoisSombre", "hanches", power=0.82),
+    part("rounded_box", (0.11, 0.06, 0.09), (0, 0.16, 0.57), "Or", "hanches", bevel=0.2),
+    part("rounded_box", (0.09, 0.14, 0.12), (-0.22, 0.06, 0.54), "Cuir", "hanches", bevel=0.22),
+    part("rounded_box", (0.09, 0.14, 0.12), (0.22, -0.05, 0.54), "Cuir", "hanches", bevel=0.22),
+    # Épaulette asymétrique : lourde spallière de cuir fauve cloutée d'or à gauche, patte agile à droite
+    part("dome", (0.25, 0.35, 0.19), (-0.29, 0, 0.99), "CuirClair", "torse", rot=(0, -22, 0), flare=1.08),
+    part("limb", (0.26, 0.36, 0.05), (-0.30, 0, 0.93), "Cuir", "torse", rot=(0, -22, 0)),
+    part("dome", (0.08, 0.08, 0.06), (-0.31, 0.10, 1.04), "Or", "torse", rot=(-45, -25, 0)),
+    part("dome", (0.19, 0.28, 0.12), (0.28, 0, 0.98), "Cuir", "torse", rot=(0, 22, 0)),
+    # Cape courte d'éclaireur vert forêt
+    part("cape", (0.46, 0.09, 0.50), (0, -0.19, 0.77), "CapeVerte", "cape", rot=(10, 0, 0)),
+    # Épée bâtarde de mercenaire
+    part("dome", (0.08, 0.08, 0.08), (0.31, -0.08, 0.53), "Or", "epee", rot=(-90, 0, 0)),
+    part("limb", (0.06, 0.18, 0.06), (0.31, 0.01, 0.53), "Cuir", "epee", rot=(90, 0, 0)),
+    part("rounded_box", (0.30, 0.06, 0.06), (0.31, 0.11, 0.53), "Or", "epee", bevel=0.2, smooth=False),
+    part("blade", (0.13, 0.94, 0.05), (0.31, 0.60, 0.53), "Acier", "epee"),
+    # Rondache bombée en bois fauve cerclée de cuir et d'acier
+    part("dome", (0.10, 0.44, 0.44), (-0.40, 0.04, 0.66), "CuirClair", "avantbras.L", rot=(0, -90, 0)),
+    part("limb", (0.07, 0.45, 0.45), (-0.39, 0.04, 0.66), "Cuir", "avantbras.L", rot=(0, 90, 0)),
+    part("dome", (0.08, 0.15, 0.15), (-0.44, 0.04, 0.66), "Acier", "avantbras.L", rot=(0, -90, 0)),
+]
+for side, s in (("R", 1), ("L", -1)):
+    PARTS_CUIR += [
+        part("limb", (0.15, 0.15, 0.25), (0.31 * s, 0, 0.86), "CapeVerte", f"bras.{side}",
              top=(1.06, 1.06), bottom=(0.85, 0.85)),
-        part("limb", (0.14, 0.14, 0.18), (0.31 * s, 0, 0.66), "Cuir", f"avantbras.{side}",
+        part("limb", (0.145, 0.145, 0.18), (0.31 * s, 0, 0.66), "Cuir", f"avantbras.{side}",
              top=(1.08, 1.08), bottom=(0.82, 0.82)),
-        part("dome", (0.12, 0.13, 0.12), (0.31 * s, 0.01, 0.53), "Peau", f"avantbras.{side}",
-             rot=(180, 0, 0)),
-        # Jambes fuselées et bottes à revers
+        part("dome", (0.12, 0.13, 0.12), (0.31 * s, 0.01, 0.53), "CuirClair", f"avantbras.{side}", rot=(180, 0, 0)),
         part("limb", (0.17, 0.17, 0.25), (0.12 * s, 0, 0.385), "Pantalon", f"cuisse.{side}",
              top=(1.08, 1.08), bottom=(0.84, 0.84)),
+        part("dome", (0.13, 0.10, 0.12), (0.12 * s, 0.06, 0.27), "CuirClair", f"cuisse.{side}", rot=(-90, 0, 0)),
         part("limb", (0.14, 0.14, 0.16), (0.12 * s, 0, 0.21), "Pantalon", f"tibia.{side}",
              top=(1.0, 1.0), bottom=(0.85, 0.85)),
-        part("limb", (0.17, 0.18, 0.11), (0.12 * s, 0.0, 0.13), "Cuir", f"tibia.{side}",
-             top=(1.12, 1.12), bottom=(0.88, 0.88)),
-        part("dome", (0.17, 0.25, 0.11), (0.12 * s, 0.04, 0.055), "Cuir", f"tibia.{side}",
-             flare=1.05),
+        part("limb", (0.175, 0.185, 0.13), (0.12 * s, 0.0, 0.14), "Cuir", f"tibia.{side}",
+             top=(1.14, 1.14), bottom=(0.88, 0.88)),
+        part("dome", (0.17, 0.25, 0.11), (0.12 * s, 0.04, 0.055), "CuirClair", f"tibia.{side}", flare=1.05),
     ]
-rig.build_mesh(PARTS)
+
+
+# 3) ENSEMBLE PLATES : Harnois complet de Chevalier, grand heaume à panache, lourdes spallières, grand écu
+PARTS_PLATES = [
+    # Grand Heaume intégral en acier poli + visière en T sombre + crête d'or + grand panache écarlate
+    part("limb", (0.20, 0.20, 0.10), (0, 0, 1.05), "AcierSombre", "tete"),
+    part("rounded_box", (0.35, 0.35, 0.34), (0, 0.01, 1.22), "Acier", "tete",
+         bottom=(0.88, 0.90), mid=(1.02, 1.02), top=(0.94, 0.94), bevel=0.28, power=0.84),
+    part("dome", (0.36, 0.36, 0.18), (0, 0.0, 1.35), "Acier", "tete", flare=1.02),
+    part("rounded_box", (0.06, 0.34, 0.09), (0, 0.02, 1.38), "Or", "tete", bevel=0.22),
+    # Fente de visière en T + mentonnière blindée
+    part("rounded_box", (0.24, 0.04, 0.05), (0, 0.175, 1.24), "Noir", "tete", bevel=0.2),
+    part("rounded_box", (0.05, 0.04, 0.15), (0, 0.178, 1.18), "Noir", "tete", bevel=0.2),
+    part("limb", (0.35, 0.34, 0.10), (0, 0.02, 1.11), "Or", "tete", power=0.82),
+    # Panache / plumet rouge flottant à l'arrière du heaume
+    part("dome", (0.14, 0.24, 0.28), (0, -0.16, 1.36), "Cape", "tete", rot=(-45, 0, 0), flare=1.1),
+    part("limb", (0.12, 0.16, 0.24), (0, -0.23, 1.22), "Cape", "tete",
+         rot=(-30, 0, 0), bottom=(0.35, 0.35), top=(1.0, 1.0)),
+
+    # Cuirasse bombée en acier poli + gorgerin royal doré + plastron gravé
+    part("limb", (0.40, 0.36, 0.12), (0, 0.0, 1.01), "Or", "torse",
+         bottom=(1.08, 1.08), top=(0.86, 0.88)),
+    part("rounded_box", (0.48, 0.34, 0.43), (0, 0.01, 0.80), "Acier", "torse",
+         bottom=(0.80, 0.82), mid=(1.02, 1.04), top=(1.10, 1.06), bevel=0.26, power=0.82),
+    part("rounded_box", (0.20, 0.36, 0.34), (0, 0.02, 0.82), "Or", "torse",
+         bottom=(0.65, 0.90), top=(1.05, 1.02), bevel=0.22),
+
+    # Hanches : tassettes blindées en acier + tabard royal bleu et or
+    part("rounded_box", (0.46, 0.34, 0.20), (0, 0, 0.50), "Acier", "hanches",
+         top=(0.84, 0.84), bottom=(1.16, 1.10), bevel=0.22, power=0.80),
+    part("rounded_box", (0.18, 0.36, 0.24), (0, 0.01, 0.48), "Tunique", "hanches",
+         top=(0.85, 0.85), bottom=(1.05, 1.02), bevel=0.18),
+    part("limb", (0.45, 0.34, 0.09), (0, 0, 0.58), "Or", "hanches", power=0.82),
+    part("dome", (0.14, 0.08, 0.13), (0, 0.175, 0.58), "Or", "hanches", rot=(-90, 0, 0)),
+
+    # Grande cape royale écarlate
+    part("cape", (0.54, 0.11, 0.70), (0, -0.21, 0.68), "Cape", "cape", rot=(8, 0, 0)),
+
+    # Grande Épée Royale (Espadon de chevalier)
+    part("dome", (0.11, 0.11, 0.11), (0.31, -0.10, 0.53), "Or", "epee", rot=(-90, 0, 0)),
+    part("limb", (0.065, 0.19, 0.065), (0.31, 0.01, 0.53), "Cape", "epee", rot=(90, 0, 0)),
+    part("rounded_box", (0.38, 0.08, 0.08), (0.31, 0.11, 0.53), "Or", "epee",
+         bottom=(0.75, 0.75), top=(1.1, 1.1), bevel=0.22, smooth=False),
+    part("blade", (0.16, 1.02, 0.06), (0.31, 0.64, 0.53), "Acier", "epee"),
+
+    # Grand Écu de Tournoi (Pavois royal)
+    part("shield", (0.09, 0.48, 0.58), (-0.41, 0.04, 0.65), "Tunique", "avantbras.L"),
+    part("rounded_box", (0.10, 0.44, 0.08), (-0.41, 0.04, 0.91), "Or", "avantbras.L", bevel=0.2, smooth=False),
+    part("dome", (0.08, 0.18, 0.22), (-0.45, 0.04, 0.67), "Or", "avantbras.L", rot=(0, -90, 0)),
+    part("rounded_box", (0.10, 0.12, 0.08), (-0.41, 0.04, 0.40), "Or", "avantbras.L", bevel=0.2, smooth=False),
+]
+for side, s in (("R", 1), ("L", -1)):
+    PARTS_PLATES += [
+        # Lourdes spallières de joute à double étage + médaillons d'or
+        part("dome", (0.28, 0.38, 0.22), (0.31 * s, 0, 1.00), "Acier", "torse",
+             rot=(0, 18 * s, 0), flare=1.12),
+        part("limb", (0.29, 0.39, 0.06), (0.32 * s, 0, 0.92), "Or", "torse",
+             rot=(0, 18 * s, 0)),
+        part("dome", (0.10, 0.10, 0.06), (0.19 * s, 0.15, 0.97), "Or", "torse", rot=(-70, 0, 0)),
+        # Bras en acier, canons d'avant-bras et gantelets blindés
+        part("limb", (0.165, 0.165, 0.25), (0.31 * s, 0, 0.86), "AcierSombre", f"bras.{side}",
+             top=(1.08, 1.08), bottom=(0.90, 0.90)),
+        part("limb", (0.16, 0.16, 0.19), (0.31 * s, 0, 0.66), "Acier", f"avantbras.{side}",
+             top=(1.12, 1.12), bottom=(0.88, 0.88)),
+        part("dome", (0.13, 0.14, 0.13), (0.31 * s, 0.01, 0.53), "Acier", f"avantbras.{side}",
+             rot=(180, 0, 0)),
+        # Cuissots, genouillères dorées, grèves d'acier et solerets blindés
+        part("limb", (0.185, 0.185, 0.25), (0.12 * s, 0, 0.385), "AcierSombre", f"cuisse.{side}",
+             top=(1.10, 1.10), bottom=(0.90, 0.90)),
+        part("dome", (0.14, 0.11, 0.13), (0.12 * s, 0.07, 0.27), "Or", f"cuisse.{side}", rot=(-90, 0, 0)),
+        part("limb", (0.165, 0.165, 0.20), (0.12 * s, 0, 0.18), "Acier", f"tibia.{side}",
+             top=(1.08, 1.08), bottom=(0.92, 0.92)),
+        part("dome", (0.18, 0.26, 0.12), (0.12 * s, 0.04, 0.055), "Acier", f"tibia.{side}",
+             flare=1.08),
+    ]
+
+body_tissu = rig.build_mesh(PARTS_TISSU, "Equip_Tissu")
+body_cuir = rig.build_mesh(PARTS_CUIR, "Equip_Cuir")
+body_plates = rig.build_mesh(PARTS_PLATES, "Equip_Plates")
 
 
 def hips(z):
@@ -207,7 +369,19 @@ rig.action("mort", [(0, HURT, hips(-0.04)), (6, KNEEL, hips(-0.27)), (12, {**KNE
 rig.reset_pose()
 bpy.ops.wm.save_as_mainfile(filepath=OUT_BLEND)
 
-# --------------------------------------------------------------------------- planche de contrôle
+# --------------------------------------------------------------------------- planches de contrôle
+# 1) Planche comparative des 3 équipements (lignes : Tissu, Cuir, Plates sur poses clés)
+EQUIP_SPEC = [("repos", 20), ("course", 4), ("attaque_1", 3), ("attaque_3", 5)]
+equip_rows = []
+for b in (body_tissu, body_cuir, body_plates):
+    rig.body = b
+    r = rig_utils.render_rows(rig, EQUIP_SPEC, target_z=0.64)
+    # Concatène les poses clés sur une seule ligne par tenue
+    equip_rows.append([cell for row in r for cell in row[:3]])
+rig_utils.save_sheet(equip_rows, OUT_EQUIP_SHEET, upscale=4)
+
+# 2) Planche complète d'animations (sur l'armure de Plates)
+rig.body = body_plates
 SHEET = [("repos", 4), ("course", 2), ("attaque_1", 2), ("attaque_2", 2), ("attaque_3", 2),
          ("esquive", 1), ("touche", 2), ("mort", 2)]
 rows = rig_utils.render_rows(rig, SHEET, target_z=0.62)
@@ -216,10 +390,19 @@ rig_utils.save_sheet(rows, OUT_SHEET)
 # --------------------------------------------------------------------------- export Godot
 rig.reset_pose()
 gltf_utils.to_principled()
-gltf_utils.export_glb(OUT_GLB, [rig.arm, rig.body], animations=True)
+models_dir = os.path.join(ROOT, "assets", "models")
+gltf_utils.export_glb(OUT_GLB, [rig.arm, body_tissu, body_cuir, body_plates], animations=True)
+gltf_utils.export_glb(os.path.join(models_dir, "hero_tissu.glb"), [rig.arm, body_tissu], animations=True)
+gltf_utils.export_glb(os.path.join(models_dir, "hero_cuir.glb"), [rig.arm, body_cuir], animations=True)
+gltf_utils.export_glb(os.path.join(models_dir, "hero_plates.glb"), [rig.arm, body_plates], animations=True)
 
 print("RESULT " + json.dumps({
-    "bones": len(BONES), "parts": len(PARTS), "verts": len(rig.body.data.vertices),
+    "bones": len(BONES),
+    "sets": {
+        "Equip_Tissu": len(body_tissu.data.vertices),
+        "Equip_Cuir": len(body_cuir.data.vertices),
+        "Equip_Plates": len(body_plates.data.vertices),
+    },
     "actions": {a.name: list(a.frame_range) for a in bpy.data.actions},
-    "sheet": [f"{n}: {len(r)} images" for (n, _), r in zip(SHEET, rows)],
+    "equip_sheet": OUT_EQUIP_SHEET,
 }))

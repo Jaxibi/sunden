@@ -5,9 +5,14 @@ extends CharacterBody3D
 ## la touche, la traînée d'épée et la rotation du coup tournoyant.
 
 signal health_changed(hp: int, max_hp: int)
+signal armor_changed(set_name: String)
 signal died
 
 enum State { MOVE, ATTACK, DODGE, HURT, DEAD }
+enum ArmorSet { TISSU, CUIR, PLATES }
+
+const ARMOR_NODES := ["Equip_Tissu", "Equip_Cuir", "Equip_Plates"]
+const ARMOR_NAMES := ["Tenue de Tissu", "Armure de Cuir", "Harnois de Plates"]
 
 ## Durées en secondes = images Blender / 30 (préparation, coup actif, récupération).
 ## trail_from/trail_to : balayage de l'épée en degrés depuis l'avant (positif = vers la gauche).
@@ -35,6 +40,7 @@ const MASK_DODGE := 1             # la roulade traverse les ennemis
 ## Cadence des animations (images par seconde). 0 = animation fluide.
 ## Une cadence basse donne l'aspect « image par image » du pixel art.
 @export var anim_fps := 15.0
+@export var armor_set: ArmorSet = ArmorSet.PLATES
 
 var hp := 0
 var state := State.MOVE
@@ -67,9 +73,25 @@ func _ready() -> void:
 	add_to_group("hero")
 	collision_mask = MASK_NORMAL
 	_mats = ToonMaterials.apply(model)
+	set_armor_set(armor_set, false)
 	_setup_animations()
 	_build_trails()
 	model.rotation.y = _yaw(facing)
+
+
+func set_armor_set(new_set: ArmorSet, fx := true) -> void:
+	armor_set = new_set
+	for i in ARMOR_NODES.size():
+		var n := model.find_child(ARMOR_NODES[i], true, false) as Node3D
+		if n:
+			n.visible = (i == int(armor_set))
+	if fx:
+		Juice.burst(global_position + Vector3.UP * 0.8, [Color("fff1d6"), Color("e8b83a")], 8, 3.0, 0.08)
+		armor_changed.emit(ARMOR_NAMES[int(armor_set)])
+
+
+func cycle_armor_set() -> void:
+	set_armor_set(((int(armor_set) + 1) % ARMOR_NODES.size()) as ArmorSet, true)
 
 
 # --------------------------------------------------------------------------- boucle

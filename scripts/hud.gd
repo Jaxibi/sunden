@@ -46,8 +46,17 @@ func _ready() -> void:
 	_boss_fill = _rect(_boss_root, Vector2(x0, 153), Vector2(BOSS_BAR_W, 5), Color("b36ae0"))
 
 
-func set_pixel_scale(pixel_scale: int, origin: Vector2) -> void:
+## Échelle et largeur native (320 en 16:9, 640 en 32:9) : les éléments centrés suivent la largeur.
+func set_layout(pixel_scale: int, origin: Vector2, native: Vector2i) -> void:
 	transform = Transform2D(0.0, Vector2(pixel_scale, pixel_scale), 0.0, origin)
+	var w := float(native.x)
+	var h := float(native.y)
+	_banner.size.x = w
+	_banner.position.y = roundf(h * 0.31)
+	_hint.size.x = w - 8.0
+	_hint.position.y = h - 16.0
+	# barre conçue pour une image de 320x180 : centrée et collée en bas
+	_boss_root.position = Vector2(roundf((w - 320.0) * 0.5), h - 180.0)
 
 
 func set_health(hp: int, max_hp: int) -> void:
