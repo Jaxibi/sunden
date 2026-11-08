@@ -1,0 +1,4 @@
+.godot/
+blender/*.blend1
+audio_raw/
+__pycache__/

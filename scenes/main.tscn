@@ -1,0 +1,38 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/pixel_camera.gd" id="2_cam"]
+[ext_resource type="PackedScene" path="res://scenes/level.tscn" id="3_level"]
+[ext_resource type="PackedScene" path="res://scenes/hero.tscn" id="4_hero"]
+[ext_resource type="Script" path="res://scripts/hud.gd" id="5_hud"]
+
+[node name="Main" type="Node"]
+process_priority = 100
+script = ExtResource("1_main")
+
+[node name="Display" type="SubViewportContainer" parent="."]
+texture_filter = 1
+offset_right = 1288.0
+offset_bottom = 728.0
+stretch = true
+stretch_shrink = 4
+
+[node name="Game" type="SubViewport" parent="Display"]
+handle_input_locally = false
+size = Vector2i(322, 182)
+render_target_update_mode = 4
+
+[node name="Level" parent="Display/Game" instance=ExtResource("3_level")]
+
+[node name="Hero" parent="Display/Game" instance=ExtResource("4_hero")]
+
+[node name="Enemies" type="Node3D" parent="Display/Game"]
+
+[node name="Camera" type="Camera3D" parent="Display/Game"]
+projection = 1
+size = 6.256
+script = ExtResource("2_cam")
+target_path = NodePath("../Hero")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+script = ExtResource("5_hud")
